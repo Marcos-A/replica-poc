@@ -473,3 +473,9 @@ Documentació tècnica:
 - Una sola bústia i un sol personatge per escenari. Tots els destinataris d'una activació reben el mateix correu inicial.
 - No es pot garantir que cada resposta s'enviï **exactament una vegada** en tots els casos d'error; el programa prioritza **no duplicar** respostes i, si dubta, deixa la conversa en `ERROR` per revisar-la a mà.
 - Sense avaluació automàtica: el docent revisa el fil i el full manualment.
+
+---
+
+## Nota sobre el desenvolupament
+
+Aquest projecte s'ha desenvolupat sota direcció i revisió humanes, amb el suport d'eines d'intel·ligència artificial per a parts del codi, la depuració i la documentació. Les decisions sobre el funcionament del sistema i la responsabilitat del resultat final corresponen a la persona que manté el projecte.
