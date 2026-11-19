@@ -35,6 +35,18 @@ function comprovaConfiguracio(ometGemini) {
     afegeix('ALLOWED_SENDERS', invalids.length ? 'ERROR' : 'OK',
       invalids.length ? invalids.length + ' adreça(es) no vàlida(es)' : remitents.length + ' adreça(es) autoritzada(es)');
   }
+  var provaParticipant = Config.analitzaRemitents(Config.propietat(Config.PROPIETATS.PROVA_PARTICIPANT));
+  if (provaParticipant.length === 0) {
+    afegeix('PROVA_PARTICIPANT', 'AVÍS', 'no definida: cal per iniciar simulacions amb provaIniciaSimulacio()');
+  } else if (provaParticipant.length > 1) {
+    afegeix('PROVA_PARTICIPANT', 'ERROR', 'conté ' + provaParticipant.length + ' adreces; ha de contenir una sola adreça (la llista completa va a ALLOWED_SENDERS)');
+  } else if (!Config.esCorreuValid(provaParticipant[0])) {
+    afegeix('PROVA_PARTICIPANT', 'ERROR', 'l\'adreça no és vàlida');
+  } else if (remitents.indexOf(provaParticipant[0]) === -1) {
+    afegeix('PROVA_PARTICIPANT', 'ERROR', Registre.emmascaraCorreu(provaParticipant[0]) + ' no és a ALLOWED_SENDERS: afegeix-la-hi');
+  } else {
+    afegeix('PROVA_PARTICIPANT', 'OK', Registre.emmascaraCorreu(provaParticipant[0]) + ' (també és a ALLOWED_SENDERS)');
+  }
   afegeix('Interruptor global', 'INFO', conf.simulacioActivada ? 'SIMULATION_ENABLED=true (processament actiu)' : 'SIMULATION_ENABLED=false (no es processa ni s\'envia res)');
 
   if (conf.spreadsheetId) {

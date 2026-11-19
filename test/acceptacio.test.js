@@ -61,6 +61,19 @@ test('Configuració incompleta: error llegible i sense exposar secrets', () => {
   assert.doesNotMatch(tot, /AIzaFALSA/);
 });
 
+test('Configuració: comprova PROVA_PARTICIPANT', () => {
+  const e = creaEntorn();
+  e.g.preparaFulls();
+  const linia = () => e.g.comprovaConfiguracio(true).text.split('\n').find((l) => l.includes('PROVA_PARTICIPANT'));
+  assert.match(linia(), /^\[AVÍS\].*no definida/);
+  e.propietats.PROVA_PARTICIPANT = 'docent.a@example.org, docent.b@example.org';
+  assert.match(linia(), /^\[ERROR\].*una sola adreça/);
+  e.propietats.PROVA_PARTICIPANT = 'altre@example.org';
+  assert.match(linia(), /^\[ERROR\].*no és a ALLOWED_SENDERS/);
+  e.propietats.PROVA_PARTICIPANT = 'docent.a@example.org';
+  assert.match(linia(), /^\[OK\] PROVA_PARTICIPANT: d\*\*\*@example\.org/);
+});
+
 test('Configuració completa: diagnòstic correcte', () => {
   const e = creaEntorn();
   e.g.preparaFulls();

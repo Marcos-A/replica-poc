@@ -98,7 +98,7 @@ El projecte no és verificat per Google; en autoritzar, cal passar per **Configu
 | `SPREADSHEET_ID` | Sí | Identificador del full de càlcul |
 | `ALLOWED_SENDERS` | Sí | Adreces separades per comes, punts i coma o espais |
 | `SIMULATION_ENABLED` | Sí | `true` o `false`. Qualsevol altre valor equival a `false`. |
-| `PROVA_PARTICIPANT` | No | **Una sola** adreça (la que fa servir `provaIniciaSimulacio()`); també ha de ser a `ALLOWED_SENDERS` |
+| `PROVA_PARTICIPANT` | Per iniciar des de l'editor | **Una sola** adreça (la que fa servir `provaIniciaSimulacio()`); també ha de ser a `ALLOWED_SENDERS`. `comprovaConfiguracio()` ho verifica. |
 | `PROVA_ESCENARI` | No | Escenari de `provaIniciaSimulacio()` (per defecte `ESC-001`) |
 
 La clau només es llegeix a `Config.clauApi()` i s'envia a Gemini per la capçalera `x-goog-api-key`, mai a l'URL. Els registres emmascaren qualsevol cadena amb format de clau (`AIza…`) i les adreces de correu.

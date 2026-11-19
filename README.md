@@ -121,7 +121,7 @@ La configuració es desa a les **Propietats de l'script** (un espai privat del p
 | `SPREADSHEET_ID` | L'identificador del full (pas 3.2) | `1AbCdEf…xyz` |
 | `ALLOWED_SENDERS` | **Totes** les adreces dels docents que poden participar, separades per comes | `docent1@example.org, docent2@example.org` |
 | `SIMULATION_ENABLED` | `false` (de moment) | `false` |
-| `PROVA_PARTICIPANT` | *(opcional)* **Una sola adreça**, sense comes: la del docent amb qui iniciareu la propera simulació. Ha de ser també a `ALLOWED_SENDERS`. | `docent1@example.org` |
+| `PROVA_PARTICIPANT` | **Necessària per iniciar simulacions des de l'editor.** **Una sola adreça**, sense comes: la del docent amb qui iniciareu la propera simulació. Ha de ser també a `ALLOWED_SENDERS`. | `docent1@example.org` |
 
 3. Feu clic a **Desa les propietats de l'script**.
 
@@ -143,7 +143,7 @@ La configuració es desa a les **Propietats de l'script** (un espai privat del p
 
 1. Trieu **`comprovaConfiguracio`** → **Executa**.
 2. Al registre, cada línia ha de començar per `[OK]` o `[INFO]`. Si n'hi ha alguna amb `[ERROR]`, el text explica què cal corregir.
-3. És normal que, en aquest punt, la línia **Disparador** surti com a `[AVÍS]`: el crearem ara.
+3. És normal que, en aquest punt, la línia **Disparador** surti com a `[AVÍS]`: el crearem ara. Si la línia **PROVA_PARTICIPANT** també surt com a `[AVÍS]`, vol dir que encara no l'heu definida: caldrà fer-ho abans d'iniciar una simulació.
 
 ### 4.3. Activar la revisió automàtica
 
@@ -238,7 +238,7 @@ Documentació tècnica:
 
 ## 10. Estat del projecte i limitacions
 
-- ✅ Codi complet i **39 proves automàtiques** superades amb dobles de prova.
+- ✅ Codi complet i **40 proves automàtiques** superades amb dobles de prova.
 - ⏳ **Pendent de verificar en real**: l'enviament, la recepció, la resposta de Gemini i la continuïtat del fil. Fins que no es faci la prova de la secció 5, el prototip **no** es pot considerar funcional. Vegeu [docs/proves.md](docs/proves.md).
 - Les respostes poden trigar diversos minuts (revisió periòdica, no instantània).
 - Una sola bústia, un sol escenari i un sol personatge.

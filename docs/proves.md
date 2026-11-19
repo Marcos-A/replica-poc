@@ -33,11 +33,11 @@ Llegenda: ✅ superada · ⏳ pendent · — no aplicable
 | Interruptor global desactivat | Cap processament ni enviament | ✅ | ⏳ |
 | Dades reservades | No apareixen al correu inicial ni es revelen per petició directa | ✅ (correu inicial i prompt) | ⏳ (resposta real de Gemini) |
 
-Proves automàtiques addicionals: error clar si PROVA_PARTICIPANT conté diverses adreces, eliminació de la pestanya per defecte només si és buida, execució simultània amb el bloqueig ocupat, respostes automàtiques («fora de l'oficina») i notificacions de no lliurament, sortida buida o no JSON de Gemini, enviament interromput (abans i després d'enviar) i reconciliació, enviament inicial interromput i reconciliació amb Enviats, coherència entre `exemples/escenari-001.json` i l'escenari carregat, absència de la clau i d'adreces completes als registres, i funcions pures (neteja de cites i signatures, detecció d'automatismes, interpretació de la resposta de Gemini).
+Proves automàtiques addicionals: error clar si PROVA_PARTICIPANT conté diverses adreces i diagnòstic de PROVA_PARTICIPANT a comprovaConfiguracio, eliminació de la pestanya per defecte només si és buida, execució simultània amb el bloqueig ocupat, respostes automàtiques («fora de l'oficina») i notificacions de no lliurament, sortida buida o no JSON de Gemini, enviament interromput (abans i després d'enviar) i reconciliació, enviament inicial interromput i reconciliació amb Enviats, coherència entre `exemples/escenari-001.json` i l'escenari carregat, absència de la clau i d'adreces completes als registres, i funcions pures (neteja de cites i signatures, detecció d'automatismes, interpretació de la resposta de Gemini).
 
 ### Resultat observat
 
-19/11/2026, Node.js 22.23.4 (contenidor `node:22-alpine`): **39 proves, 39 superades, 0 fallades.**
+19/11/2026, Node.js 22.23.4 (contenidor `node:22-alpine`): **40 proves, 40 superades, 0 fallades.**
 
 ## Prova manual d'integració (pendent)
 
