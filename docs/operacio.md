@@ -14,7 +14,7 @@ També es pot canviar a mà a **Configuració del projecte → Propietats de l's
 ## Iniciar una simulació
 
 1. Comproveu que l'adreça del participant és a `ALLOWED_SENDERS`.
-2. Poseu-la a la propietat `PROVA_PARTICIPANT` (**només aquesta adreça**, sense comes; la llista completa va a `ALLOWED_SENDERS`) (i, si cal, l'escenari a `PROVA_ESCENARI`; per defecte `ESC-001`).
+2. Poseu-la a la propietat `PROVA_PARTICIPANT`: **només aquesta adreça**, sense comes (la llista completa va a `ALLOWED_SENDERS`). Si cal, poseu l'escenari a `PROVA_ESCENARI` (per defecte, `ESC-001`).
 3. Executeu `provaIniciaSimulacio`.
 4. El registre mostra `idConversa` i `threadId`. Al full, pestanya **Converses**, apareix una fila nova en estat `ACTIVA`.
 
