@@ -1,0 +1,39 @@
+# --- Credencials i configuració local de clasp (mai al repositori) ---
+.clasp.json
+.clasprc.json
+**/.clasprc.json
+creds.json
+credentials*.json
+client_secret*.json
+token*.json
+service-account*.json
+*.pem
+*.key
+*.p12
+
+# --- Variables d'entorn i secrets ---
+.env
+.env.*
+!.env.example
+*.secret
+secrets/
+
+# --- Dades exportades de proves (poden contenir adreces de docents) ---
+*.csv
+*.xlsx
+*.ods
+exportacions/
+
+# --- Dependències i fitxers generats ---
+node_modules/
+npm-debug.log*
+coverage/
+.npm/
+
+# --- Sistema i editor ---
+.DS_Store
+Thumbs.db
+.vscode/*
+!.vscode/extensions.json
+.idea/
+*.swp
