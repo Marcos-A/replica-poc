@@ -265,7 +265,8 @@ Documentació tècnica:
 ## 10. Estat del projecte i limitacions
 
 - ✅ Codi complet i **46 proves automàtiques** superades amb dobles de prova.
-- ⏳ **Pendent de verificar en real**: l'enviament, la recepció, la resposta de Gemini i la continuïtat del fil. Fins que no es faci la prova de la secció 5, el prototip **no** es pot considerar funcional. Vegeu [docs/proves.md](docs/proves.md).
+- ✅ **Verificat en real (19/11/2026)**: enviament del correu inicial, recepció, resposta del participant, generació amb Gemini i resposta automàtica dins del mateix fil.
+- ⏳ **Pendents de verificar en real**: execució doble, missatges consecutius, intents de revelar dades reservades, tancament de la conversa i límit de torns. Vegeu [docs/proves.md](docs/proves.md).
 - Les respostes poden trigar diversos minuts (revisió periòdica, no instantània).
 - Una sola bústia, un sol escenari i un sol personatge.
 - No es pot garantir que cada resposta s'enviï **exactament una vegada** en tots els casos d'error; el programa prioritza **no duplicar** respostes i, si dubta, deixa la conversa en `ERROR` per revisar-la a mà.
