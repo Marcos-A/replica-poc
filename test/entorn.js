@@ -80,6 +80,11 @@ class FalsLlibre {
   constructor() { this.fulls = new Map(); }
   getSheetByName(nom) { return this.fulls.get(nom) || null; }
   insertSheet(nom) { const f = new FalsFull(nom); this.fulls.set(nom, f); return f; }
+  getSheets() { return [...this.fulls.values()]; }
+  deleteSheet(full) {
+    if (this.fulls.size === 1) throw new Error('No es pot eliminar l\'única pestanya');
+    this.fulls.delete(full.getName());
+  }
 }
 
 // ------------------------------------------------------------ Gmail

@@ -110,8 +110,28 @@ var Repositori = (function () {
       afegeix_(FULLS.ESCENARIS, escenariInicial);
       canvis.push('Escenari afegit: ' + escenariInicial.id);
     }
+    eliminaFullsBuitsPerDefecte_(llibre).forEach(function (nom) {
+      canvis.push('Pestanya buida eliminada: ' + nom);
+    });
     SpreadsheetApp.flush();
     return canvis;
+  }
+
+  /**
+   * Elimina la pestanya que Google crea amb cada full nou ("Sheet1",
+   * "Full 1", "Hoja 1"...), només si és completament buida.
+   */
+  function eliminaFullsBuitsPerDefecte_(llibre) {
+    var PATRO_NOM_PER_DEFECTE = /^(Sheet|Full|Hoja|Feuille|Foglio|Tabelle|Blad|Folha)\s?\d+$/i;
+    var eliminades = [];
+    llibre.getSheets().forEach(function (full) {
+      var nom = full.getName();
+      if (COLUMNES[nom] || !PATRO_NOM_PER_DEFECTE.test(nom)) return;
+      if (full.getLastRow() !== 0 || full.getLastColumn() !== 0) return;
+      llibre.deleteSheet(full);
+      eliminades.push(nom);
+    });
+    return eliminades;
   }
 
   /** Llegeix una pestanya com a llista d'objectes amb el número de fila. */

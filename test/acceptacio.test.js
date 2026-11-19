@@ -29,6 +29,18 @@ test('Inicialització repetida: no duplica pestanyes ni escenaris', () => {
   assert.equal(e.full('Escenaris').objectes()[0].id, 'ESC-001');
 });
 
+test('Inicialització: elimina la pestanya per defecte només si és buida', () => {
+  const e = creaEntorn();
+  e.llibre.insertSheet('Sheet1');
+  const ambDades = e.llibre.insertSheet('Full 2');
+  ambDades.dades = [['nota del docent']];
+  e.llibre.insertSheet('Notes');
+  const canvis = e.g.preparaFulls();
+  assert.ok(canvis.includes('Pestanya buida eliminada: Sheet1'));
+  assert.deepEqual([...e.llibre.fulls.keys()].sort(),
+    ['Converses', 'Escenaris', 'Full 2', 'Missatges', 'Notes']);
+});
+
 test('Inicialització: afegeix columnes que falten sense esborrar dades', () => {
   const e = creaEntorn();
   const full = e.llibre.insertSheet('Converses');
