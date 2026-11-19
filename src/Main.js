@@ -125,10 +125,11 @@ function comprovaConfiguracio(ometGemini) {
 
   var disparadors = Disparador.compta();
   var aplicat = Disparador.intervalAplicat();
-  afegeix('Disparador', disparadors === 1 ? 'OK' : (disparadors === 0 ? 'AVÍS' : 'ERROR'),
+  afegeix('Disparador', disparadors === 1 && aplicat ? 'OK' : disparadors === 1 ? 'AVÍS' : (disparadors === 0 ? 'AVÍS' : 'ERROR'),
     disparadors === 0 ? 'no n\'hi ha cap: executa creaDisparador()' :
       disparadors > 1 ? disparadors + ' disparadors: executa creaDisparador() perquè en quedi un de sol' :
-        'revisió cada ' + (aplicat || '?') + ' minut(s)');
+        aplicat ? 'revisió cada ' + aplicat + ' minut(s)'
+          : 'interval desconegut (creat amb una versió anterior): executeu creaDisparador per actualitzar-lo');
 
   var correcte = diagnostics.every(function (d) { return d.estat !== 'ERROR'; });
   var text = diagnostics.map(function (d) {
