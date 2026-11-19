@@ -192,7 +192,7 @@ Verificat amb la documentació oficial el 19/11/2026:
 - **API**: *Interactions API*, que Google recomana per a projectes nous (`generateContent` continua disponible però es considera llegada).
 - **Endpoint**: `POST https://generativelanguage.googleapis.com/v1beta/interactions`
 - **Capçaleres**: `x-goog-api-key`, `Content-Type: application/json`, `Api-Revision: 2026-05-20`
-- **Cos**: `model`, `system_instruction`, `input`, `generation_config.max_output_tokens`, `response_format` (`mime_type: application/json` + esquema JSON amb `resposta` i `finalitzada`) i `store: false` (no es desa la interacció al servidor).
+- **Cos**: `model`, `system_instruction`, `input`, `generation_config.max_output_tokens`, `response_format` (`mime_type: application/json` + esquema JSON amb `salutacio`, `paragrafs`, `comiat` i `finalitzada`; el codi munta el correu amb els paràgrafs separats i hi afegeix la signatura a partir de l'escenari) i `store: false` (no es desa la interacció al servidor).
 - **Resposta**: `status: "completed"` i `steps[]`; el text és als passos `type: "model_output"` → `content[].text`. L'adaptador també accepta el format antic `outputs[]`.
 - **Diagnòstic**: `comprovaConfiguracio()` fa `GET /v1beta/models/{model}` per confirmar que el model existeix, sense consumir quota de generació.
 

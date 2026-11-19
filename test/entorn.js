@@ -209,7 +209,26 @@ function respostaGemini(resposta, finalitzada = false) {
   };
 }
 
-const TEXT_RESPOSTA = 'Bon dia,\n\nGràcies per la resposta. Necessito que em confirmeu per escrit la data de lliurament.\n\nAtentament,\nMarta Soler\nFerreteria Soler SL';
+/** Resposta en el format actual: el correu per parts (el codi el munta). */
+function respostaGeminiPerParts(parts, finalitzada = false) {
+  return {
+    codi: 200,
+    cos: JSON.stringify({
+      id: 'int_1', status: 'completed',
+      steps: [{ type: 'model_output', status: 'done',
+        content: [{ type: 'text', text: JSON.stringify(Object.assign({}, parts, { finalitzada })) }] }]
+    })
+  };
+}
+
+const PARTS_RESPOSTA = {
+  salutacio: 'Bon dia,',
+  paragrafs: ['Gràcies per la resposta.', 'Necessito que em confirmeu per escrit la data de lliurament.'],
+  comiat: 'Atentament,'
+};
+
+const TEXT_RESPOSTA = 'Bon dia,\n\nGràcies per la resposta.\n\nNecessito que em confirmeu per escrit la data de lliurament.\n\n' +
+  'Atentament,\nMarta Soler\nResponsable de compres\nFerreteria Soler SL';
 
 // --------------------------------------------------------------- Ui
 
@@ -278,7 +297,7 @@ function creaEntorn(opcions = {}) {
   const disparadors = [];
   const estat = { bloqueigOcupat: false, uuid: 0, respostesIA: [] };
 
-  const respostaPerDefecte = () => respostaGemini(TEXT_RESPOSTA, false);
+  const respostaPerDefecte = () => respostaGeminiPerParts(PARTS_RESPOSTA, false);
 
   const context = {
     console: {
@@ -391,4 +410,4 @@ function creaEntorn(opcions = {}) {
   };
 }
 
-module.exports = { creaEntorn, respostaGemini, BUSTIA, TEXT_RESPOSTA };
+module.exports = { creaEntorn, respostaGemini, respostaGeminiPerParts, BUSTIA, TEXT_RESPOSTA };

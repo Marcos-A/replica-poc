@@ -7,7 +7,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
-const { creaEntorn, respostaGemini, BUSTIA } = require('./entorn');
+const { creaEntorn, respostaGemini, BUSTIA, TEXT_RESPOSTA } = require('./entorn');
 
 const PARTICIPANT = 'docent.a@example.org';
 
@@ -234,6 +234,8 @@ test('Resposta del participant: resposta coherent al mateix fil', () => {
   assert.equal(resposta.tipus, 'resposta');
   assert.equal(resposta.fil, e.conversa.threadId);
   assert.equal(resposta.a, `Docent A <${PARTICIPANT}>`);
+  // El correu es munta per parts: paràgrafs separats i signatura en línies.
+  assert.equal(resposta.cos, TEXT_RESPOSTA);
   const [c] = e.converses();
   assert.equal(c.torns_ia, '1');
   assert.equal(c.estat, 'ACTIVA');

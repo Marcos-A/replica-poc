@@ -36,7 +36,7 @@ var Indicacions = (function () {
       'REGLES',
       '- Escriu en ' + nomIdioma_(escenari.idioma) + ' professional i natural, com un correu comercial breu (entre 60 i 200 paraules).',
       '- Text pla: sense Markdown, sense asteriscs, sense títols, sense assumpte i sense notes entre claudàtors.',
-      '- Comença amb una salutació i acaba signant com a ' + escenari.interlocutor + ' (' + escenari.empresa + ').',
+      '- Estructura del correu: una salutació, el cos en paràgrafs curts (normalment de dos a quatre, un per idea) i una fórmula de comiat. No hi escriguis la signatura: s\'hi afegirà sola amb el teu nom, càrrec i empresa (' + escenari.interlocutor + ', ' + escenari.empresa + ').',
       '- Mantén els fets de la situació. No inventis números de seguiment, dates de lliurament confirmades, imports ni polítiques comercials que no s\'hagin esmentat a la conversa.',
       '- Reacciona a les propostes concretes del proveïdor. No repeteixis mecànicament la reclamació.',
       '- No acceptis promeses vagues ("ho mirarem", "aviat") com si fossin compromisos: demana concreció (què, quan, com).',
@@ -59,7 +59,8 @@ var Indicacions = (function () {
     linies.push(
       '',
       'FORMAT DE SORTIDA',
-      'Retorna només un objecte JSON amb dues claus: "resposta" (el text del correu) i "finalitzada" (booleà).'
+      'Retorna només un objecte JSON amb aquestes claus: "salutacio" (només la salutació), "paragrafs" (llista amb un ' +
+        'element per paràgraf del cos), "comiat" (només la fórmula de comiat, sense nom) i "finalitzada" (booleà).'
     );
     return linies.join('\n');
   }

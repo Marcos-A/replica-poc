@@ -15,19 +15,34 @@ var Gemini = (function () {
   var API_REVISION = '2026-05-20';
   var PROVEIDOR = 'gemini';
 
+  /**
+   * El correu es demana per parts i el codi el munta (componCorreu): si es
+   * demana en un sol text, el model de vegades el retorna sense cap salt de
+   * línia, amb la salutació, el cos i la signatura en un sol paràgraf.
+   */
   var ESQUEMA_SORTIDA = {
     type: 'object',
     properties: {
-      resposta: {
+      salutacio: {
         type: 'string',
-        description: 'Text complet del correu de resposta, en text pla.'
+        description: 'Només la salutació inicial, per exemple "Bon dia," o "Benvolgut Sr. Puig,".'
+      },
+      paragrafs: {
+        type: 'array',
+        items: { type: 'string' },
+        minItems: 1,
+        description: 'Cos del correu, un element per paràgraf (normalment de dos a quatre). Sense salutació, comiat ni signatura.'
+      },
+      comiat: {
+        type: 'string',
+        description: 'Només la fórmula de comiat, sense nom ni signatura, per exemple "Atentament," o "Salutacions,".'
       },
       finalitzada: {
         type: 'boolean',
         description: 'true només si aquest missatge tanca la situació.'
       }
     },
-    required: ['resposta', 'finalitzada'],
+    required: ['salutacio', 'paragrafs', 'comiat', 'finalitzada'],
     additionalProperties: false
   };
 
@@ -90,10 +105,43 @@ var Gemini = (function () {
   }
 
   /**
-   * Interpreta la resposta HTTP (funció pura). Llança errors amb
-   * `reintentable` segons el tipus de fallada.
+   * Signatura a partir de l'escenari, una dada per línia:
+   * "Marta Soler, responsable de compres" + "Ferreteria Soler SL" →
+   * "Marta Soler\nResponsable de compres\nFerreteria Soler SL".
    */
-  function interpretaResposta(codi, cos) {
+  function signatura(escenari) {
+    var e = escenari || {};
+    var parts = String(e.interlocutor || '').split(',');
+    var nom = parts[0].trim();
+    var carrec = parts.slice(1).join(',').trim();
+    if (carrec) carrec = carrec.charAt(0).toUpperCase() + carrec.slice(1);
+    return [nom, carrec, String(e.empresa || '').trim()].filter(function (l) { return l; }).join('\n');
+  }
+
+  /**
+   * Munta el correu a partir de les parts: salutació, paràgrafs separats per
+   * una línia en blanc, comiat i signatura (funció pura).
+   */
+  function componCorreu(parts, escenari) {
+    var nom = String((escenari && escenari.interlocutor) || '').split(',')[0].trim();
+    var salutacio = netejaText(parts.salutacio || '');
+    var paragrafs = (parts.paragrafs || []).map(function (p) { return netejaText(p); })
+      .filter(function (p) { return p; });
+    var comiat = netejaText(parts.comiat || '').split('\n')[0].trim();
+    // Si el model hi ha posat el nom ("Salutacions, Laura Vidal"), es treu:
+    // la signatura ja el porta.
+    if (nom && comiat.indexOf(nom) !== -1) {
+      comiat = comiat.slice(0, comiat.indexOf(nom)).trim();
+    }
+    var tancament = [comiat, signatura(escenari)].filter(function (l) { return l; }).join('\n');
+    return [salutacio, paragrafs.join('\n\n'), tancament].filter(function (b) { return b; }).join('\n\n');
+  }
+
+  /**
+   * Interpreta la resposta HTTP (funció pura). Llança errors amb
+   * `reintentable` segons el tipus de fallada. `escenari` dona la signatura.
+   */
+  function interpretaResposta(codi, cos, escenari) {
     if (codi === 429 || codi >= 500) {
       throw ProveidorIA.errorIA('Gemini no disponible o quota exhaurida (HTTP ' + codi + '): ' + missatgeErrorApi_(cos), true, 'HTTP_' + codi);
     }
@@ -119,10 +167,17 @@ var Gemini = (function () {
     } catch (e) {
       throw ProveidorIA.errorIA('La sortida de Gemini no segueix el format JSON demanat.', true, 'SORTIDA_INVALIDA');
     }
-    if (!estructurat || typeof estructurat.resposta !== 'string' || typeof estructurat.finalitzada !== 'boolean') {
-      throw ProveidorIA.errorIA('La sortida de Gemini no té els camps "resposta" i "finalitzada".', true, 'SORTIDA_INVALIDA');
+    if (!estructurat || typeof estructurat.finalitzada !== 'boolean') {
+      throw ProveidorIA.errorIA('La sortida de Gemini no indica si la conversa ha finalitzat ("finalitzada").', true, 'SORTIDA_INVALIDA');
     }
-    return { text: netejaText(estructurat.resposta), finalitzada: estructurat.finalitzada };
+    if (Array.isArray(estructurat.paragrafs)) {
+      return { text: componCorreu(estructurat, escenari), finalitzada: estructurat.finalitzada };
+    }
+    // Format anterior: tot el correu en un sol camp.
+    if (typeof estructurat.resposta === 'string') {
+      return { text: netejaText(estructurat.resposta), finalitzada: estructurat.finalitzada };
+    }
+    throw ProveidorIA.errorIA('La sortida de Gemini no té el camp "paragrafs".', true, 'SORTIDA_INVALIDA');
   }
 
   function genera(context) {
@@ -141,7 +196,7 @@ var Gemini = (function () {
     } catch (e) {
       throw ProveidorIA.errorIA('No s\'ha pogut contactar amb Gemini: ' + Registre.resumError(e), true, 'XARXA');
     }
-    var resultat = interpretaResposta(resposta.getResponseCode(), resposta.getContentText());
+    var resultat = interpretaResposta(resposta.getResponseCode(), resposta.getContentText(), context.escenari);
     return { text: resultat.text, finalitzada: resultat.finalitzada, proveidor: PROVEIDOR, model: model };
   }
 
@@ -164,6 +219,8 @@ var Gemini = (function () {
     construeixPeticio: construeixPeticio,
     interpretaResposta: interpretaResposta,
     netejaText: netejaText,
+    signatura: signatura,
+    componCorreu: componCorreu,
     genera: genera,
     comprovaModel: comprovaModel
   };

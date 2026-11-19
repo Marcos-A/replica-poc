@@ -54,6 +54,21 @@ test('Gemini.interpretaResposta: format steps, outputs i blocs de codi', () => {
   assert.equal(g.Gemini.interpretaResposta(200, outputs).finalitzada, true);
 });
 
+test('Gemini: el correu es munta per parts amb paràgrafs i signatura', () => {
+  const escenari = { interlocutor: 'Laura Vidal, propietària', empresa: 'Estudi Creatiu Vidal' };
+  assert.equal(g.Gemini.signatura(escenari), 'Laura Vidal\nPropietària\nEstudi Creatiu Vidal');
+  const cos = JSON.stringify({ status: 'completed', steps: [{ type: 'model_output', content: [{ type: 'text', text: JSON.stringify({
+    salutacio: 'Hola Marcos,',
+    paragrafs: ['Gràcies per la rapidesa.', '  ', 'La franja de demà ens va bé.'],
+    comiat: 'Salutacions, Laura Vidal, propietària',
+    finalitzada: true
+  }) }] }] });
+  const r = g.Gemini.interpretaResposta(200, cos, escenari);
+  assert.equal(r.text, 'Hola Marcos,\n\nGràcies per la rapidesa.\n\nLa franja de demà ens va bé.\n\n' +
+    'Salutacions,\nLaura Vidal\nPropietària\nEstudi Creatiu Vidal');
+  assert.equal(r.finalitzada, true);
+});
+
 test('Gemini.interpretaResposta: errors classificats', () => {
   const reintentable = (codi, cos) => {
     try { g.Gemini.interpretaResposta(codi, cos); } catch (e) { return e.reintentable; }
@@ -79,7 +94,7 @@ test('Gemini.construeixPeticio: format de la petició', () => {
   assert.equal(p.system_instruction, 'S');
   assert.equal(p.input, 'E');
   assert.equal(p.store, false);
-  assert.deepEqual(Array.from(p.response_format.schema.required), ['resposta', 'finalitzada']);
+  assert.deepEqual(Array.from(p.response_format.schema.required), ['salutacio', 'paragrafs', 'comiat', 'finalitzada']);
   assert.ok(p.generation_config.max_output_tokens > 0);
 });
 
