@@ -2924,3 +2924,5 @@ var Repositori = (function () {
     diagnostica: diagnostica
   };
 })();
+
+// ===== FI DE Replica.gs: si veieu aquesta línia, el fitxer és sencer =====

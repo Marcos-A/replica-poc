@@ -36,7 +36,9 @@ function genera() {
     const codi = fs.readFileSync(path.join(DIR_SRC, f), 'utf8').replace(/\s+$/, '');
     return '// ===== src/' + f + ' =====\n\n' + codi + '\n';
   }).join('\n');
-  return capcalera + '\n' + cos;
+  // Marca final fixa: permet comprovar a l'editor que s'ha enganxat sencer.
+  const final = '\n// ===== FI DE Replica.gs: si veieu aquesta línia, el fitxer és sencer =====\n';
+  return capcalera + '\n' + cos + final;
 }
 
 module.exports = { genera, SORTIDA };

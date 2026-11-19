@@ -45,3 +45,10 @@ test('dist/Replica.gs inclou el menú: vinculat al full, sense SPREADSHEET_ID', 
   e.g.menuComprovaConfiguracio();
   assert.match(e.ui.darrer().text, /\[OK\] Codi: tots els mòduls carregats/);
 });
+
+test('dist/Replica.gs acaba amb la marca final que cita el README', () => {
+  const codi = fs.readFileSync(SORTIDA, 'utf8');
+  const marca = '// ===== FI DE Replica.gs: si veieu aquesta línia, el fitxer és sencer =====';
+  assert.equal(codi.trimEnd().split('\n').pop(), marca);
+  assert.ok(fs.readFileSync(require('node:path').join(__dirname, '..', 'README.md'), 'utf8').includes('`' + marca + '`'));
+});

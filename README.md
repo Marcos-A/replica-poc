@@ -108,7 +108,7 @@ A l'editor veureu un fitxer anomenat `Codi.gs` (o `Code.gs`) i `appsscript.json`
 
 1. **`appsscript.json`**: obriu-lo, esborreu-ne tot el contingut i enganxeu-hi el contingut de `src/appsscript.json`. Deseu (icona del disquet o `Ctrl+S`).
 2. **`Codi.gs`**: feu clic als tres punts del costat del nom → **Canvia el nom** → escriviu `Replica` (l'editor hi afegeix `.gs`).
-3. Obriu **`Replica.gs`**, esborreu-ne tot el contingut (`Ctrl+A` i `Supr`) i enganxeu-hi **sencer** el contingut de `dist/Replica.gs`. És un fitxer llarg: comproveu que comença per `/**` i `Rèplica · prova de concepte` i que acaba per `function menuDesaClauGemini() { Menu.desaClauGemini(); }`.
+3. Obriu **`Replica.gs`**, esborreu-ne tot el contingut (`Ctrl+A` i `Supr`) i enganxeu-hi **sencer** el contingut de `dist/Replica.gs`. És un fitxer llarg: comproveu que comença per `/**` i `Rèplica · prova de concepte` i que la darrera línia és `// ===== FI DE Replica.gs: si veieu aquesta línia, el fitxer és sencer =====`.
 4. Deseu.
 
 Al final, a la llista de fitxers de l'editor hi ha d'haver **només** `appsscript.json` i `Replica.gs`.
@@ -465,7 +465,7 @@ Documentació tècnica:
 
 ## 11. Estat del projecte i limitacions
 
-- ✅ Codi complet i **81 proves automàtiques** superades amb dobles de prova.
+- ✅ Codi complet i **82 proves automàtiques** superades amb dobles de prova.
 - ✅ **Verificat en real (19/11/2026)**: enviament del correu inicial, recepció, resposta del participant, generació amb Gemini i resposta automàtica dins del mateix fil (amb un sol participant i la instal·lació independent, des de l'editor).
 - ⏳ **Pendents de verificar en real**: el menú Rèplica i la instal·lació dins del full, les activacions amb diversos participants a la vegada, el límit diari de correus, execució doble, missatges consecutius, intents de revelar dades reservades, tancament de la conversa i límit de torns. Vegeu [docs/proves.md](docs/proves.md).
 - Pensat per a **pocs participants** a la vegada: vegeu els [límits de Gmail i de Gemini](#7-límits-de-gmail-i-de-gemini).
