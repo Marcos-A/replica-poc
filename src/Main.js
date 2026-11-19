@@ -105,6 +105,10 @@ function provaIniciaSimulacio() {
   if (!correu) {
     throw new Error('Defineix la propietat PROVA_PARTICIPANT amb l\'adreça del docent participant.');
   }
+  if (Config.analitzaRemitents(correu).length > 1) {
+    throw new Error('PROVA_PARTICIPANT ha de contenir una sola adreça (la del docent amb qui inicies ' +
+      'aquesta simulació). La llista de tots els participants va a ALLOWED_SENDERS.');
+  }
   var escenari = Config.propietat(Config.PROPIETATS.PROVA_ESCENARI) || 'ESC-001';
   var resultat = iniciaSimulacio(correu, escenari);
   Registre.info('Conversa creada', resultat);

@@ -121,7 +121,7 @@ La configuració es desa a les **Propietats de l'script** (un espai privat del p
 | `SPREADSHEET_ID` | L'identificador del full (pas 3.2) | `1AbCdEf…xyz` |
 | `ALLOWED_SENDERS` | Adreces dels docents participants, separades per comes | `docent1@example.org, docent2@example.org` |
 | `SIMULATION_ENABLED` | `false` (de moment) | `false` |
-| `PROVA_PARTICIPANT` | *(opcional)* Adreça del docent que farà la prova | `docent1@example.org` |
+| `PROVA_PARTICIPANT` | *(opcional)* **Una sola** adreça: la del docent amb qui iniciareu la simulació | `docent1@example.org` |
 
 3. Feu clic a **Desa les propietats de l'script**.
 
@@ -236,7 +236,7 @@ Documentació tècnica:
 
 ## 10. Estat del projecte i limitacions
 
-- ✅ Codi complet i **38 proves automàtiques** superades amb dobles de prova.
+- ✅ Codi complet i **39 proves automàtiques** superades amb dobles de prova.
 - ⏳ **Pendent de verificar en real**: l'enviament, la recepció, la resposta de Gemini i la continuïtat del fil. Fins que no es faci la prova de la secció 5, el prototip **no** es pot considerar funcional. Vegeu [docs/proves.md](docs/proves.md).
 - Les respostes poden trigar diversos minuts (revisió periòdica, no instantània).
 - Una sola bústia, un sol escenari i un sol personatge.

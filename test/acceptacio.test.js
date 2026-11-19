@@ -104,6 +104,16 @@ test('Inici: rebutja adreces no autoritzades, duplicats i interruptor apagat', (
   assert.equal(e.gmail.enviats.length, 1);
 });
 
+test('provaIniciaSimulacio: PROVA_PARTICIPANT amb diverses adreces dona un error clar', () => {
+  const e = creaEntorn({ propietats: { PROVA_PARTICIPANT: 'docent.a@example.org, docent.b@example.org' } });
+  e.g.preparaFulls();
+  assert.throws(() => e.g.provaIniciaSimulacio(), /una sola adreça/);
+  assert.equal(e.gmail.enviats.length, 0);
+  e.propietats.PROVA_PARTICIPANT = 'docent.a@example.org';
+  e.g.provaIniciaSimulacio();
+  assert.equal(e.gmail.enviats.length, 1);
+});
+
 test('Resposta del participant: resposta coherent al mateix fil', () => {
   const e = entornIniciat();
   e.gmail.respon(e.conversa.threadId, `Docent A <${PARTICIPANT}>`,
