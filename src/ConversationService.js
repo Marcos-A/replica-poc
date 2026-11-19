@@ -39,16 +39,28 @@ var Simulacio = (function () {
 
   // ---------------------------------------------------------------- Inici
 
-  function inicia(correuParticipant, idEscenari) {
+  /**
+   * Correus de la clienta enviats en les darreres 24 hores i quants en
+   * queden fins al límit de la pestanya Configuració (correus_per_dia).
+   */
+  function correusDisponibles() {
+    var limit = Repositori.configuracio().valors.correusPerDia;
+    var desDe = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+    var enviats = Repositori.correusEnviatsDesDe(desDe);
+    return { limit: limit, enviats: enviats, restants: Math.max(0, limit - enviats) };
+  }
+
+  function inicia(correuParticipant, idEscenari, idActivacio) {
     var adreca = Config.normalitzaCorreu(correuParticipant);
     if (!Config.llegeix().simulacioActivada) {
-      throw new Error('La simulació està desactivada (SIMULATION_ENABLED=false). Activa-la amb activaSimulacions() quan el coordinador ho confirmi.');
+      throw new Error('La simulació està desactivada (SIMULATION_ENABLED=false). Activeu-la amb Rèplica › Activa les simulacions (o executeu activaSimulacions) quan el coordinador ho confirmi.');
     }
     if (!Config.esCorreuValid(adreca)) {
       throw new Error('L\'adreça del participant no és vàlida.');
     }
-    if (!Config.esRemitentAutoritzat(adreca)) {
-      throw new Error('L\'adreça ' + Registre.emmascaraCorreu(adreca) + ' no és a ALLOWED_SENDERS.');
+    if (!Repositori.esParticipantActiu(adreca)) {
+      throw new Error('L\'adreça ' + Registre.emmascaraCorreu(adreca) + ' no és a la pestanya Participants ' +
+        '(o no hi està marcada com a activa).');
     }
     if (Bustia.adrecesPropies().indexOf(adreca) !== -1) {
       throw new Error('El participant no pot ser la mateixa bústia de prova.');
@@ -59,6 +71,11 @@ var Simulacio = (function () {
     if (!escenari.assumpte_inicial || !escenari.missatge_inicial) {
       throw new Error('L\'escenari ' + escenari.id + ' no té assumpte o missatge inicial.');
     }
+    var correus = correusDisponibles();
+    if (correus.restants <= 0) {
+      throw new Error('S\'ha arribat al límit de ' + correus.limit + ' correus en 24 hores (correus_per_dia, pestanya ' +
+        'Configuració). Torneu-ho a provar més tard.');
+    }
 
     var execucio = ambBloqueig_(function () {
       var oberta = Repositori.converses([E_().ACTIVA, E_().PROCESSANT, E_().ERROR]).filter(function (c) {
@@ -66,7 +83,7 @@ var Simulacio = (function () {
       });
       if (oberta.length > 0) {
         throw new Error('Ja hi ha una conversa oberta (' + oberta[0].id_conversa + ', ' + oberta[0].estat +
-          ') d\'aquest escenari per a aquest participant. Tanca-la amb tancaConversa() si cal tornar a començar.');
+          ') d\'aquest escenari per a aquest participant. Atureu-la (Rèplica › Atura la conversa seleccionada, o tancaConversa) si cal tornar a començar.');
       }
       var idConversa = Utilities.getUuid();
       var idMissatge = Utilities.getUuid();
@@ -81,7 +98,8 @@ var Simulacio = (function () {
         torns_ia: 0,
         data_inici: ara,
         data_actualitzacio: ara,
-        darrer_error: ''
+        darrer_error: '',
+        id_activacio: idActivacio || ''
       });
       Repositori.afegeixMissatge({
         id_missatge: idMissatge,
@@ -132,28 +150,39 @@ var Simulacio = (function () {
       return { estat: 'BLOQUEJAT' };
     }
     var inici = Date.now();
-    var resum = { estat: 'OK', revisades: 0, respostes: 0, errors: 0, ajornades: 0 };
+    var resum = { estat: 'OK', revisades: 0, respostes: 0, errors: 0, ajornades: 0, limitDiari: 0 };
     try {
       try {
         Disparador.sincronitza();
       } catch (e) {
         Registre.avis('No s\'ha pogut actualitzar l\'interval del disparador', { error: Registre.resumError(e) });
       }
-      var converses = Repositori.converses([E_().ACTIVA, E_().PROCESSANT]);
+      // Es llegeixen totes les converses, primer les que fa més temps que no
+      // canvien: així cap conversa queda sempre al final de la cua. El límit
+      // per execució s'aplica a les respostes de la IA, no a les lectures.
+      var converses = Repositori.converses([E_().ACTIVA, E_().PROCESSANT]).sort(function (a, b) {
+        return a.data_actualitzacio < b.data_actualitzacio ? -1 : a.data_actualitzacio > b.data_actualitzacio ? 1 : 0;
+      });
       if (converses.length === 0) return resum;
-      var propies = Bustia.adrecesPropies();
+      var ctx = {
+        propies: Bustia.adrecesPropies(),
+        actius: Repositori.participantsActius(),
+        restants: correusDisponibles().restants,
+        generades: 0
+      };
       for (var i = 0; i < converses.length; i++) {
-        if (resum.revisades >= Config.LIMITS.MAX_CONVERSES_PER_EXECUCIO ||
-            Date.now() - inici > Config.LIMITS.TEMPS_MAX_EXECUCIO_MS) {
-          resum.ajornades = converses.length - i;
+        if (Date.now() - inici > Config.LIMITS.TEMPS_MAX_EXECUCIO_MS) {
+          resum.ajornades += converses.length - i;
           break;
         }
         resum.revisades++;
         var c = converses[i];
         try {
-          var resultat = processaConversa_(c, propies);
+          var resultat = processaConversa_(c, ctx);
           if (resultat === 'RESPOSTA') resum.respostes++;
           if (resultat === 'ERROR') resum.errors++;
+          if (resultat === 'AJORNADA') resum.ajornades++;
+          if (resultat === 'LIMIT_DIARI') resum.limitDiari++;
         } catch (e) {
           resum.errors++;
           Registre.error('Error inesperat processant una conversa', { idConversa: c.id_conversa, error: Registre.resumError(e) });
@@ -182,8 +211,13 @@ var Simulacio = (function () {
     });
   }
 
-  function processaConversa_(conversa, propies) {
+  /**
+   * ctx: { propies, actius, restants (correus que es poden enviar),
+   * generades (respostes de la IA en aquesta execució) }.
+   */
+  function processaConversa_(conversa, ctx) {
     var c = conversa;
+    var propies = ctx.propies;
     if (c.estat === E_().PROCESSANT) {
       if (!reconcilia_(c, propies)) return 'RECONCILIADA';
       c = Repositori.conversa(c.id_conversa);
@@ -201,7 +235,7 @@ var Simulacio = (function () {
 
     // 1. Registrar els missatges nous vàlids del participant.
     var registrats = Repositori.missatges(c.id_conversa);
-    var nous = registraEntrants_(c, registrats, propies);
+    var nous = registraEntrants_(c, registrats, ctx);
     if (nous > 0) registrats = Repositori.missatges(c.id_conversa);
 
     // 2. Hi ha alguna intervenció pendent?
@@ -211,6 +245,13 @@ var Simulacio = (function () {
       Repositori.actualitzaConversa(c.id_conversa, { estat: E_().FINALITZADA });
       return 'FINALITZADA';
     }
+    // Límits: queda pendent (sense canviar res) per a la propera execució.
+    if (ctx.generades >= Config.LIMITS.MAX_RESPOSTES_PER_EXECUCIO) return 'AJORNADA';
+    if (ctx.restants <= 0) {
+      Registre.avis('Límit diari de correus: la resposta espera a la propera revisió', { idConversa: c.id_conversa });
+      return 'LIMIT_DIARI';
+    }
+    ctx.generades++;
     var darrerTorn = c.torns_ia + 1 >= escenari.max_torns;
     var historial = registrats.filter(function (m) {
       if (pendents.indexOf(m) !== -1) return false;
@@ -266,6 +307,7 @@ var Simulacio = (function () {
       Registre.error('Enviament no confirmat; es reconciliarà a la propera execució', { idConversa: c.id_conversa });
       return 'ERROR';
     }
+    ctx.restants--;
     completaEnviament_(c.id_conversa, idMissatge, enviat.messageId, tanca);
     Registre.info('Resposta enviada', {
       idConversa: c.id_conversa, torn: c.torns_ia + 1, finalitzada: tanca, model: resposta.model
@@ -274,14 +316,14 @@ var Simulacio = (function () {
   }
 
   /** Registra els missatges entrants vàlids; retorna quants n'ha afegit. */
-  function registraEntrants_(c, registrats, propies) {
+  function registraEntrants_(c, registrats, ctx) {
     var coneguts = {};
     registrats.forEach(function (m) {
       if (m.gmail_message_id) coneguts[m.gmail_message_id] = true;
     });
-    var autoritzat = Config.esRemitentAutoritzat(c.correu_participant);
+    var autoritzat = ctx.actius.indexOf(c.correu_participant) !== -1;
     var afegits = 0;
-    Bustia.llegeixFil(c.gmail_thread_id, coneguts, propies).forEach(function (d) {
+    Bustia.llegeixFil(c.gmail_thread_id, coneguts, ctx.propies).forEach(function (d) {
       if (d.conegut) return;
       if (d.propi) {
         Registre.avis('Missatge de la pròpia bústia no registrat; s\'ignora', { idConversa: c.id_conversa, gmailId: d.id });
@@ -395,7 +437,7 @@ var Simulacio = (function () {
       if (!c) throw new Error('No existeix la conversa ' + idConversa + '.');
       if (c.estat !== E_().ERROR) throw new Error('Només es poden reactivar converses en ERROR (estat actual: ' + c.estat + ').');
       if (!c.gmail_thread_id) {
-        throw new Error('La conversa no té fil de Gmail: tanca-la amb tancaConversa() i torna-la a iniciar.');
+        throw new Error('La conversa no té fil de Gmail: atureu-la (Rèplica › Atura la conversa seleccionada, o tancaConversa) i torneu a iniciar la simulació.');
       }
       Repositori.actualitzaConversa(idConversa, { estat: E_().ACTIVA, darrer_error: '' });
       return { idConversa: idConversa, estat: E_().ACTIVA };
@@ -417,6 +459,7 @@ var Simulacio = (function () {
 
   return {
     inicia: inicia,
+    correusDisponibles: correusDisponibles,
     processaPendents: processaPendents,
     pendentsDeResposta: pendentsDeResposta,
     reactiva: reactiva,

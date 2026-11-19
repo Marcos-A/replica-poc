@@ -46,6 +46,9 @@ class FalsRang {
   }
   setNumberFormat() { return this; }
   setDataValidation(regla) { this.full.validacions[`${this.fila},${this.col}`] = regla; return this; }
+  getRow() { return this.fila; }
+  getNumRows() { return this.nf; }
+  getSheet() { return this.full; }
 }
 
 class FalsFull {
@@ -72,6 +75,15 @@ class FalsFull {
     return new FalsRang(this, 1, 1, Math.max(this.getLastRow(), 0), Math.max(this.getLastColumn(), 1));
   }
   setFrozenRows() {}
+  deleteRow(fila) {
+    this.dades.splice(fila - 1, 1);
+    const validacions = {};
+    Object.entries(this.validacions).forEach(([clau, regla]) => {
+      const [f, c] = clau.split(',').map(Number);
+      if (f !== fila) validacions[`${f > fila ? f - 1 : f},${c}`] = regla;
+    });
+    this.validacions = validacions;
+  }
   /** Ajuda de prova: files com a objectes. */
   objectes() {
     const [cap, ...files] = this.dades;
@@ -81,7 +93,14 @@ class FalsFull {
 }
 
 class FalsLlibre {
-  constructor() { this.fulls = new Map(); }
+  constructor(propietari) { this.fulls = new Map(); this.propietari = propietari; this.seleccio = null; }
+  getId() { return 'full-de-prova'; }
+  getName() { return 'Rèplica – dades'; }
+  /** null simula un full d'una unitat compartida (sense propietari). */
+  getOwner() { return this.propietari === null ? null : { getEmail: () => this.propietari }; }
+  getActiveRange() { return this.seleccio; }
+  /** Ajuda de prova: selecciona nf files a partir de `fila` d'una pestanya. */
+  selecciona(nom, fila, nf = 1) { this.seleccio = this.getSheetByName(nom).getRange(fila, 1, nf, 3); }
   getSheetByName(nom) { return this.fulls.get(nom) || null; }
   insertSheet(nom) { const f = new FalsFull(nom); this.fulls.set(nom, f); return f; }
   getSheets() { return [...this.fulls.values()]; }
@@ -192,6 +211,55 @@ function respostaGemini(resposta, finalitzada = false) {
 
 const TEXT_RESPOSTA = 'Bon dia,\n\nGràcies per la resposta. Necessito que em confirmeu per escrit la data de lliurament.\n\nAtentament,\nMarta Soler\nFerreteria Soler SL';
 
+// --------------------------------------------------------------- Ui
+
+/** Doble de SpreadsheetApp.getUi(): desa diàlegs i menús, respon el que es demana. */
+function creaUi() {
+  const ui = {
+    ButtonSet: { OK: 'OK', YES_NO: 'YES_NO', OK_CANCEL: 'OK_CANCEL' },
+    Button: { OK: 'OK', CANCEL: 'CANCEL', YES: 'YES', NO: 'NO', CLOSE: 'CLOSE' },
+    dialegs: [],
+    respostes: [], // botons que "premerà" el docent a les confirmacions (per defecte, Sí)
+    textos: [], // [boto, text] per als quadres amb camp de text
+    menu: null,
+    alert(titol, text, botons) {
+      ui.dialegs.push({ titol, text, botons });
+      if (botons === 'YES_NO') return ui.respostes.length ? ui.respostes.shift() : 'YES';
+      return 'OK';
+    },
+    prompt(titol, text, botons) {
+      ui.dialegs.push({ titol, text, botons, prompt: true });
+      const [boto, resposta] = ui.textos.shift() || ['CANCEL', ''];
+      return { getSelectedButton: () => boto, getResponseText: () => resposta };
+    },
+    createMenu(titol) {
+      const m = {
+        titol, elements: [],
+        addItem(text, funcio) { m.elements.push({ text, funcio }); return m; },
+        addSeparator() { m.elements.push({ separador: true }); return m; },
+        addSubMenu(sub) { m.elements.push({ submenu: sub }); return m; },
+        addToUi() { ui.menu = m; }
+      };
+      return m;
+    },
+    /** Llista plana de [text, funció] del menú, inclosos els submenús. */
+    opcions() {
+      const pla = (m) => m.elements.flatMap((e) => e.submenu ? pla(e.submenu) : e.separador ? [] : [[e.text, e.funcio]]);
+      return ui.menu ? pla(ui.menu) : [];
+    },
+    darrer() { return ui.dialegs[ui.dialegs.length - 1]; }
+  };
+  return ui;
+}
+
+/**
+ * opcions:
+ * - propietats: Script Properties (se sumen a les de per defecte).
+ * - vinculat: el projecte és vinculat al full (getActiveSpreadsheet el retorna).
+ * - usuari: compte que executa (getEffectiveUser). Per defecte, la bústia.
+ * - usuariActiu: getActiveUser en l'activador simple ('' com amb Gmail).
+ * - propietari: propietari del full (null: unitat compartida). Per defecte, la bústia.
+ */
 function creaEntorn(opcions = {}) {
   const propietats = Object.assign({
     GEMINI_API_KEY: 'AIzaFALSAfalsaFALSAfalsa1234567890',
@@ -200,7 +268,10 @@ function creaEntorn(opcions = {}) {
     ALLOWED_SENDERS: 'docent.a@example.org, docent.b@example.org',
     SIMULATION_ENABLED: 'true'
   }, opcions.propietats || {});
-  const llibre = new FalsLlibre();
+  const llibre = new FalsLlibre(opcions.propietari === undefined ? BUSTIA : opcions.propietari);
+  const propietatsUsuari = {};
+  const ui = creaUi();
+  const usuari = opcions.usuari === undefined ? BUSTIA : opcions.usuari;
   const gmail = new FalsGmail();
   const peticions = [];
   const registres = [];
@@ -216,7 +287,13 @@ function creaEntorn(opcions = {}) {
     PropertiesService: {
       getScriptProperties: () => ({
         getProperty: (k) => (k in propietats ? propietats[k] : null),
-        setProperty: (k, v) => { propietats[k] = v; }
+        setProperty: (k, v) => { propietats[k] = v; },
+        deleteProperty: (k) => { delete propietats[k]; }
+      }),
+      getUserProperties: () => ({
+        getProperty: (k) => (k in propietatsUsuari ? propietatsUsuari[k] : null),
+        setProperty: (k, v) => { propietatsUsuari[k] = v; },
+        deleteProperty: (k) => { delete propietatsUsuari[k]; }
       })
     },
     LockService: {
@@ -227,6 +304,8 @@ function creaEntorn(opcions = {}) {
     },
     SpreadsheetApp: {
       openById: (id) => { if (id !== 'full-de-prova') throw new Error('No es troba el full'); return llibre; },
+      getActiveSpreadsheet: () => (opcions.vinculat ? llibre : null),
+      getUi: () => ui,
       flush: () => {},
       newDataValidation: () => {
         const regla = {};
@@ -234,6 +313,7 @@ function creaEntorn(opcions = {}) {
           requireValueInList: (llista) => { regla.llista = llista; return b; },
           requireValueInRange: (rang) => { regla.rang = rang; return b; },
           requireNumberBetween: (min, max) => { regla.entre = [min, max]; return b; },
+          requireCheckbox: () => { regla.casella = true; return b; },
           setAllowInvalid: () => b,
           setHelpText: () => b,
           build: () => regla
@@ -242,8 +322,15 @@ function creaEntorn(opcions = {}) {
       }
     },
     GmailApp: gmail,
-    Session: { getEffectiveUser: () => ({ getEmail: () => BUSTIA }) },
-    Utilities: { getUuid: () => 'uuid-' + (++estat.uuid) },
+    Session: {
+      getEffectiveUser: () => ({ getEmail: () => usuari }),
+      getActiveUser: () => ({ getEmail: () => opcions.usuariActiu || '' }),
+      getScriptTimeZone: () => 'Europe/Madrid'
+    },
+    Utilities: {
+      getUuid: () => 'uuid-' + (++estat.uuid),
+      formatDate: (data) => data.toISOString().slice(0, 16).replace('T', ' ')
+    },
     UrlFetchApp: {
       fetch: (url, o) => {
         peticions.push({ url, opcions: o, cos: o.payload ? JSON.parse(o.payload) : null });
@@ -273,7 +360,7 @@ function creaEntorn(opcions = {}) {
 
   const g = context;
   return {
-    g, llibre, gmail, peticions, registres, propietats, estat, disparadors,
+    g, llibre, gmail, peticions, registres, propietats, propietatsUsuari, estat, disparadors, ui,
     full: (nom) => llibre.getSheetByName(nom),
     converses: () => llibre.getSheetByName('Converses').objectes(),
     missatges: () => llibre.getSheetByName('Missatges').objectes(),
@@ -285,6 +372,21 @@ function creaEntorn(opcions = {}) {
       fila[1] = valor;
     },
     parametre: (clau) => (llibre.getSheetByName('Configuració').dades.find((f) => f[0] === clau) || [])[1],
+    participants: () => llibre.getSheetByName('Participants').objectes(),
+    activacions: () => llibre.getSheetByName('Activacions').objectes(),
+    /** Afegeix una fila a Activacions, com ho faria el docent. Retorna el número de fila. */
+    novaActivacio: (escenari, destinataris) => {
+      const full = llibre.getSheetByName('Activacions');
+      const fila = full.getLastRow() + 1;
+      while (full.dades.length < fila) full.dades.push([]);
+      full.dades[fila - 1] = ['', escenari, destinataris, '', '', ''];
+      return fila;
+    },
+    /** Marca o desmarca un participant, com ho faria el docent. */
+    marcaParticipant: (correu, actiu) => {
+      const fila = llibre.getSheetByName('Participants').dades.find((f) => f[0] === correu);
+      fila[1] = actiu;
+    },
     peticionsIA: () => peticions.filter((p) => p.url.endsWith('/interactions'))
   };
 }

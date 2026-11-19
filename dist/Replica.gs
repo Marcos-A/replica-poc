@@ -3,7 +3,7 @@
  * https://github.com/Marcos-A/replica-poc
  *
  * FITXER GENERAT: no l'editeu. Editeu els fitxers de src/ i executeu
- * "npm run build". Conté, per ordre: AiProvider.js, Config.js, ConversationService.js, EscenariInicial.js, GeminiProvider.js, GmailGateway.js, Logger.js, Main.js, PromptBuilder.js, SheetsRepository.js.
+ * "npm run build". Conté, per ordre: AiProvider.js, Config.js, ConversationService.js, EscenariInicial.js, GeminiProvider.js, GmailGateway.js, Logger.js, Main.js, Menu.js, PromptBuilder.js, SheetsRepository.js.
  *
  * Instal·lació: enganxeu aquest fitxer sencer en un sol fitxer de
  * l'editor d'Apps Script (Replica.gs), juntament amb appsscript.json.
@@ -81,29 +81,41 @@ var ProveidorIA = (function () {
  *
  * Els secrets (GEMINI_API_KEY) només es llegeixen a clauApi() i no es
  * retornen mai en cap altre objecte, diagnòstic ni registre.
+ *
+ * La clau pot ser en dos llocs:
+ * - Propietats d'usuari del compte de prova (desaClau, des del menú). No es
+ *   veuen a Configuració del projecte, i el codi que executa una altra
+ *   persona no les pot llegir. Tenen prioritat.
+ * - Propietats de l'script. Qualsevol editor del projecte les veu; en un
+ *   projecte vinculat, això vol dir qualsevol editor del full.
  */
 var Config = (function () {
   var PROPIETATS = {
     CLAU: 'GEMINI_API_KEY',
     MODEL: 'GEMINI_MODEL',
     FULL: 'SPREADSHEET_ID',
-    REMITENTS: 'ALLOWED_SENDERS',
     ACTIVAT: 'SIMULATION_ENABLED',
     // Interna: interval amb què es va crear el disparador actual.
     INTERVAL_APLICAT: 'INTERVAL_APLICAT',
-    // Obsoletes: ara són a la pestanya Configuració. preparaFulls() les hi
-    // copia si existeixen, i comprovaConfiguracio() avisa que es poden esborrar.
+    // Obsoletes. ALLOWED_SENDERS: ara és la pestanya Participants, i
+    // preparaFulls() hi copia les adreces en crear-la. PROVA_*: versions
+    // anteriors. comprovaConfiguracio() avisa que es poden esborrar.
+    REMITENTS: 'ALLOWED_SENDERS',
     PROVA_PARTICIPANT: 'PROVA_PARTICIPANT',
     PROVA_ESCENARI: 'PROVA_ESCENARI'
   };
 
+  /**
+   * Propietats de l'script sempre obligatòries. La clau (que pot ser a les
+   * propietats d'usuari) i SPREADSHEET_ID (opcional si el projecte està
+   * vinculat al full) es comproven a part.
+   */
   var OBLIGATORIES = [
-    PROPIETATS.CLAU,
     PROPIETATS.MODEL,
-    PROPIETATS.FULL,
-    PROPIETATS.REMITENTS,
     PROPIETATS.ACTIVAT
   ];
+
+  var UBICACIONS_CLAU = { USUARI: 'USUARI', SCRIPT: 'SCRIPT' };
 
   /**
    * Límits de volum i durada. Els valors per defecte de l'interval i dels
@@ -113,7 +125,12 @@ var Config = (function () {
     INTERVALS_PERMESOS: [1, 5, 10, 15, 30],
     MAX_TORNS_PER_DEFECTE: 6,
     MAX_TORNS_ABSOLUT: 12,
-    MAX_CONVERSES_PER_EXECUCIO: 10,
+    // Respostes de la IA per execució (totes les converses es llegeixen).
+    MAX_RESPOSTES_PER_EXECUCIO: 10,
+    MAX_DESTINATARIS_PER_ACTIVACIO: 50,
+    // Correus que pot enviar Apps Script en 24 hores: compte de Gmail o Workspace.
+    CORREUS_PER_DIA_PERMESOS: [100, 1500],
+    CORREUS_PER_DIA_PER_DEFECTE: 100,
     // Les execucions d'Apps Script s'aturen als 6 minuts; deixem marge.
     TEMPS_MAX_EXECUCIO_MS: 4 * 60 * 1000,
     ESPERA_BLOQUEIG_MS: 2000,
@@ -130,6 +147,18 @@ var Config = (function () {
     return PropertiesService.getScriptProperties();
   }
 
+  function propietatsUsuari_() {
+    return PropertiesService.getUserProperties();
+  }
+
+  function clauUsuari_() {
+    return String(propietatsUsuari_().getProperty(PROPIETATS.CLAU) || '').trim();
+  }
+
+  function clauScript_() {
+    return String(propietats_().getProperty(PROPIETATS.CLAU) || '').trim();
+  }
+
   function normalitzaCorreu(correu) {
     return String(correu || '').trim().toLowerCase();
   }
@@ -138,7 +167,7 @@ var Config = (function () {
     return REGEX_CORREU.test(normalitzaCorreu(correu));
   }
 
-  /** Converteix "a@x.cat, b@y.cat; c@z.cat" en una llista normalitzada. */
+  /** Converteix "a@x.cat, b@y.cat; c@z.cat" (o una adreça per línia) en una llista normalitzada. */
   function analitzaRemitents(valor) {
     return String(valor || '')
       .split(/[\s,;]+/)
@@ -156,19 +185,43 @@ var Config = (function () {
     return {
       model: String(p.getProperty(PROPIETATS.MODEL) || '').trim().replace(/^models\//, ''),
       spreadsheetId: String(p.getProperty(PROPIETATS.FULL) || '').trim(),
-      remitentsAutoritzats: analitzaRemitents(p.getProperty(PROPIETATS.REMITENTS)),
       simulacioActivada: esCert_(p.getProperty(PROPIETATS.ACTIVAT)),
-      teClauApi: String(p.getProperty(PROPIETATS.CLAU) || '').trim().length > 0
+      teClauApi: ubicacioClau() !== null
     };
   }
 
   /** Únic punt d'accés a la clau. No la registris ni la retornis enlloc. */
   function clauApi() {
-    var clau = String(propietats_().getProperty(PROPIETATS.CLAU) || '').trim();
+    var clau = clauUsuari_() || clauScript_();
     if (!clau) {
-      throw new Error('Falta la propietat ' + PROPIETATS.CLAU + ' a Script Properties.');
+      throw new Error('Falta la clau de Gemini: deseu-la amb Rèplica › Configuració › Desa la clau de Gemini ' +
+        '(o afegiu la propietat ' + PROPIETATS.CLAU + ' a les Propietats de l\'script).');
     }
     return clau;
+  }
+
+  /** On és la clau: 'USUARI', 'SCRIPT' o null. No en retorna mai el valor. */
+  function ubicacioClau() {
+    if (clauUsuari_()) return UBICACIONS_CLAU.USUARI;
+    if (clauScript_()) return UBICACIONS_CLAU.SCRIPT;
+    return null;
+  }
+
+  /**
+   * Desa la clau a les propietats d'usuari de qui executa (el compte de
+   * prova) i l'esborra de les Propietats de l'script, on la veuria qualsevol
+   * editor. Retorna { esborradaDeScript }.
+   */
+  function desaClau(clau) {
+    var neta = String(clau || '').trim();
+    if (!/^\S{20,}$/.test(neta)) {
+      throw new Error('Això no sembla una clau de Gemini: ha de ser un sol bloc de text, sense espais ' +
+        '(normalment comença per AIza).');
+    }
+    propietatsUsuari_().setProperty(PROPIETATS.CLAU, neta);
+    var esborrada = clauScript_() !== '';
+    if (esborrada) propietats_().deleteProperty(PROPIETATS.CLAU);
+    return { esborradaDeScript: esborrada };
   }
 
   /** Noms de les propietats obligatòries que falten o són buides. */
@@ -177,11 +230,6 @@ var Config = (function () {
     return OBLIGATORIES.filter(function (nom) {
       return String(p.getProperty(nom) || '').trim() === '';
     });
-  }
-
-  function esRemitentAutoritzat(correu) {
-    var c = normalitzaCorreu(correu);
-    return llegeix().remitentsAutoritzats.indexOf(c) !== -1;
   }
 
   function estableixSimulacio(activada) {
@@ -204,11 +252,13 @@ var Config = (function () {
   return {
     PROPIETATS: PROPIETATS,
     OBLIGATORIES: OBLIGATORIES,
+    UBICACIONS_CLAU: UBICACIONS_CLAU,
     LIMITS: LIMITS,
     llegeix: llegeix,
     clauApi: clauApi,
+    ubicacioClau: ubicacioClau,
+    desaClau: desaClau,
     propietatsQueFalten: propietatsQueFalten,
-    esRemitentAutoritzat: esRemitentAutoritzat,
     estableixSimulacio: estableixSimulacio,
     propietat: propietat,
     estableixPropietat: estableixPropietat,
@@ -261,16 +311,28 @@ var Simulacio = (function () {
 
   // ---------------------------------------------------------------- Inici
 
-  function inicia(correuParticipant, idEscenari) {
+  /**
+   * Correus de la clienta enviats en les darreres 24 hores i quants en
+   * queden fins al límit de la pestanya Configuració (correus_per_dia).
+   */
+  function correusDisponibles() {
+    var limit = Repositori.configuracio().valors.correusPerDia;
+    var desDe = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+    var enviats = Repositori.correusEnviatsDesDe(desDe);
+    return { limit: limit, enviats: enviats, restants: Math.max(0, limit - enviats) };
+  }
+
+  function inicia(correuParticipant, idEscenari, idActivacio) {
     var adreca = Config.normalitzaCorreu(correuParticipant);
     if (!Config.llegeix().simulacioActivada) {
-      throw new Error('La simulació està desactivada (SIMULATION_ENABLED=false). Activa-la amb activaSimulacions() quan el coordinador ho confirmi.');
+      throw new Error('La simulació està desactivada (SIMULATION_ENABLED=false). Activeu-la amb Rèplica › Activa les simulacions (o executeu activaSimulacions) quan el coordinador ho confirmi.');
     }
     if (!Config.esCorreuValid(adreca)) {
       throw new Error('L\'adreça del participant no és vàlida.');
     }
-    if (!Config.esRemitentAutoritzat(adreca)) {
-      throw new Error('L\'adreça ' + Registre.emmascaraCorreu(adreca) + ' no és a ALLOWED_SENDERS.');
+    if (!Repositori.esParticipantActiu(adreca)) {
+      throw new Error('L\'adreça ' + Registre.emmascaraCorreu(adreca) + ' no és a la pestanya Participants ' +
+        '(o no hi està marcada com a activa).');
     }
     if (Bustia.adrecesPropies().indexOf(adreca) !== -1) {
       throw new Error('El participant no pot ser la mateixa bústia de prova.');
@@ -281,6 +343,11 @@ var Simulacio = (function () {
     if (!escenari.assumpte_inicial || !escenari.missatge_inicial) {
       throw new Error('L\'escenari ' + escenari.id + ' no té assumpte o missatge inicial.');
     }
+    var correus = correusDisponibles();
+    if (correus.restants <= 0) {
+      throw new Error('S\'ha arribat al límit de ' + correus.limit + ' correus en 24 hores (correus_per_dia, pestanya ' +
+        'Configuració). Torneu-ho a provar més tard.');
+    }
 
     var execucio = ambBloqueig_(function () {
       var oberta = Repositori.converses([E_().ACTIVA, E_().PROCESSANT, E_().ERROR]).filter(function (c) {
@@ -288,7 +355,7 @@ var Simulacio = (function () {
       });
       if (oberta.length > 0) {
         throw new Error('Ja hi ha una conversa oberta (' + oberta[0].id_conversa + ', ' + oberta[0].estat +
-          ') d\'aquest escenari per a aquest participant. Tanca-la amb tancaConversa() si cal tornar a començar.');
+          ') d\'aquest escenari per a aquest participant. Atureu-la (Rèplica › Atura la conversa seleccionada, o tancaConversa) si cal tornar a començar.');
       }
       var idConversa = Utilities.getUuid();
       var idMissatge = Utilities.getUuid();
@@ -303,7 +370,8 @@ var Simulacio = (function () {
         torns_ia: 0,
         data_inici: ara,
         data_actualitzacio: ara,
-        darrer_error: ''
+        darrer_error: '',
+        id_activacio: idActivacio || ''
       });
       Repositori.afegeixMissatge({
         id_missatge: idMissatge,
@@ -354,28 +422,39 @@ var Simulacio = (function () {
       return { estat: 'BLOQUEJAT' };
     }
     var inici = Date.now();
-    var resum = { estat: 'OK', revisades: 0, respostes: 0, errors: 0, ajornades: 0 };
+    var resum = { estat: 'OK', revisades: 0, respostes: 0, errors: 0, ajornades: 0, limitDiari: 0 };
     try {
       try {
         Disparador.sincronitza();
       } catch (e) {
         Registre.avis('No s\'ha pogut actualitzar l\'interval del disparador', { error: Registre.resumError(e) });
       }
-      var converses = Repositori.converses([E_().ACTIVA, E_().PROCESSANT]);
+      // Es llegeixen totes les converses, primer les que fa més temps que no
+      // canvien: així cap conversa queda sempre al final de la cua. El límit
+      // per execució s'aplica a les respostes de la IA, no a les lectures.
+      var converses = Repositori.converses([E_().ACTIVA, E_().PROCESSANT]).sort(function (a, b) {
+        return a.data_actualitzacio < b.data_actualitzacio ? -1 : a.data_actualitzacio > b.data_actualitzacio ? 1 : 0;
+      });
       if (converses.length === 0) return resum;
-      var propies = Bustia.adrecesPropies();
+      var ctx = {
+        propies: Bustia.adrecesPropies(),
+        actius: Repositori.participantsActius(),
+        restants: correusDisponibles().restants,
+        generades: 0
+      };
       for (var i = 0; i < converses.length; i++) {
-        if (resum.revisades >= Config.LIMITS.MAX_CONVERSES_PER_EXECUCIO ||
-            Date.now() - inici > Config.LIMITS.TEMPS_MAX_EXECUCIO_MS) {
-          resum.ajornades = converses.length - i;
+        if (Date.now() - inici > Config.LIMITS.TEMPS_MAX_EXECUCIO_MS) {
+          resum.ajornades += converses.length - i;
           break;
         }
         resum.revisades++;
         var c = converses[i];
         try {
-          var resultat = processaConversa_(c, propies);
+          var resultat = processaConversa_(c, ctx);
           if (resultat === 'RESPOSTA') resum.respostes++;
           if (resultat === 'ERROR') resum.errors++;
+          if (resultat === 'AJORNADA') resum.ajornades++;
+          if (resultat === 'LIMIT_DIARI') resum.limitDiari++;
         } catch (e) {
           resum.errors++;
           Registre.error('Error inesperat processant una conversa', { idConversa: c.id_conversa, error: Registre.resumError(e) });
@@ -404,8 +483,13 @@ var Simulacio = (function () {
     });
   }
 
-  function processaConversa_(conversa, propies) {
+  /**
+   * ctx: { propies, actius, restants (correus que es poden enviar),
+   * generades (respostes de la IA en aquesta execució) }.
+   */
+  function processaConversa_(conversa, ctx) {
     var c = conversa;
+    var propies = ctx.propies;
     if (c.estat === E_().PROCESSANT) {
       if (!reconcilia_(c, propies)) return 'RECONCILIADA';
       c = Repositori.conversa(c.id_conversa);
@@ -423,7 +507,7 @@ var Simulacio = (function () {
 
     // 1. Registrar els missatges nous vàlids del participant.
     var registrats = Repositori.missatges(c.id_conversa);
-    var nous = registraEntrants_(c, registrats, propies);
+    var nous = registraEntrants_(c, registrats, ctx);
     if (nous > 0) registrats = Repositori.missatges(c.id_conversa);
 
     // 2. Hi ha alguna intervenció pendent?
@@ -433,6 +517,13 @@ var Simulacio = (function () {
       Repositori.actualitzaConversa(c.id_conversa, { estat: E_().FINALITZADA });
       return 'FINALITZADA';
     }
+    // Límits: queda pendent (sense canviar res) per a la propera execució.
+    if (ctx.generades >= Config.LIMITS.MAX_RESPOSTES_PER_EXECUCIO) return 'AJORNADA';
+    if (ctx.restants <= 0) {
+      Registre.avis('Límit diari de correus: la resposta espera a la propera revisió', { idConversa: c.id_conversa });
+      return 'LIMIT_DIARI';
+    }
+    ctx.generades++;
     var darrerTorn = c.torns_ia + 1 >= escenari.max_torns;
     var historial = registrats.filter(function (m) {
       if (pendents.indexOf(m) !== -1) return false;
@@ -488,6 +579,7 @@ var Simulacio = (function () {
       Registre.error('Enviament no confirmat; es reconciliarà a la propera execució', { idConversa: c.id_conversa });
       return 'ERROR';
     }
+    ctx.restants--;
     completaEnviament_(c.id_conversa, idMissatge, enviat.messageId, tanca);
     Registre.info('Resposta enviada', {
       idConversa: c.id_conversa, torn: c.torns_ia + 1, finalitzada: tanca, model: resposta.model
@@ -496,14 +588,14 @@ var Simulacio = (function () {
   }
 
   /** Registra els missatges entrants vàlids; retorna quants n'ha afegit. */
-  function registraEntrants_(c, registrats, propies) {
+  function registraEntrants_(c, registrats, ctx) {
     var coneguts = {};
     registrats.forEach(function (m) {
       if (m.gmail_message_id) coneguts[m.gmail_message_id] = true;
     });
-    var autoritzat = Config.esRemitentAutoritzat(c.correu_participant);
+    var autoritzat = ctx.actius.indexOf(c.correu_participant) !== -1;
     var afegits = 0;
-    Bustia.llegeixFil(c.gmail_thread_id, coneguts, propies).forEach(function (d) {
+    Bustia.llegeixFil(c.gmail_thread_id, coneguts, ctx.propies).forEach(function (d) {
       if (d.conegut) return;
       if (d.propi) {
         Registre.avis('Missatge de la pròpia bústia no registrat; s\'ignora', { idConversa: c.id_conversa, gmailId: d.id });
@@ -617,7 +709,7 @@ var Simulacio = (function () {
       if (!c) throw new Error('No existeix la conversa ' + idConversa + '.');
       if (c.estat !== E_().ERROR) throw new Error('Només es poden reactivar converses en ERROR (estat actual: ' + c.estat + ').');
       if (!c.gmail_thread_id) {
-        throw new Error('La conversa no té fil de Gmail: tanca-la amb tancaConversa() i torna-la a iniciar.');
+        throw new Error('La conversa no té fil de Gmail: atureu-la (Rèplica › Atura la conversa seleccionada, o tancaConversa) i torneu a iniciar la simulació.');
       }
       Repositori.actualitzaConversa(idConversa, { estat: E_().ACTIVA, darrer_error: '' });
       return { idConversa: idConversa, estat: E_().ACTIVA };
@@ -639,6 +731,7 @@ var Simulacio = (function () {
 
   return {
     inicia: inicia,
+    correusDisponibles: correusDisponibles,
     processaPendents: processaPendents,
     pendentsDeResposta: pendentsDeResposta,
     reactiva: reactiva,
@@ -1104,7 +1197,8 @@ var Registre = (function () {
 /**
  * Funcions públiques del Laboratori (visibles al desplegable "Executa" de
  * l'editor d'Apps Script). La lògica és als mòduls; aquí només hi ha
- * punts d'entrada i missatges per al docent coordinador.
+ * punts d'entrada i missatges per al docent coordinador. El menú «Rèplica»
+ * del full de càlcul (src/Menu.js) crida aquestes mateixes funcions.
  */
 
 /**
@@ -1120,6 +1214,8 @@ var MODULS_ = [
   ['Bustia', 'GmailGateway'],
   ['Registre', 'Logger'],
   ['Disparador', 'Main'],
+  ['Compte', 'Main'],
+  ['Menu', 'Menu'],
   ['Indicacions', 'PromptBuilder'],
   ['Repositori', 'SheetsRepository']
 ];
@@ -1168,6 +1264,12 @@ function comprovaConfiguracio(ometGemini) {
   }
   afegeix('Codi', 'OK', 'tots els mòduls carregats');
 
+  var origen = Repositori.origen();
+  var compte = Compte.comprova();
+  afegeix('Compte', compte.correcte ? 'OK' : 'ERROR', compte.correcte
+    ? 'el programa s\'executa amb el compte de prova, propietari del full (' + Registre.emmascaraCorreu(compte.propietari) + ')'
+    : Registre.sanititza(compte.missatge));
+
   var propietatsQueFalten = Config.propietatsQueFalten();
   Config.OBLIGATORIES.forEach(function (nom) {
     var falta = propietatsQueFalten.indexOf(nom) !== -1;
@@ -1175,33 +1277,60 @@ function comprovaConfiguracio(ometGemini) {
       falta ? 'falta: afegeix-la a Configuració del projecte > Propietats de l\'script' : 'configurada');
   });
 
-  var conf = Config.llegeix();
-  var remitents = conf.remitentsAutoritzats;
-  var invalids = remitents.filter(function (c) { return !Config.esCorreuValid(c); });
-  if (remitents.length > 0) {
-    afegeix('ALLOWED_SENDERS', invalids.length ? 'ERROR' : 'OK',
-      invalids.length ? invalids.length + ' adreça(es) no vàlida(es)' : remitents.length + ' adreça(es) autoritzada(es)');
+  if (origen.vinculat) {
+    if (!origen.idPropietat) {
+      afegeix('Full de càlcul', 'OK', 'el programa està instal·lat al full «' + origen.nomVinculat + '» (no cal SPREADSHEET_ID)');
+    } else if (origen.idPropietat === origen.idVinculat) {
+      afegeix('Propietat SPREADSHEET_ID', 'INFO', 'és el mateix full on està instal·lat el programa: no cal, podeu esborrar-la');
+    } else {
+      afegeix('Propietat SPREADSHEET_ID', 'ERROR', 'apunta a un full diferent d\'aquell on està instal·lat el programa: ' +
+        'esborreu-la de les Propietats de l\'script');
+    }
+  } else {
+    afegeix('Propietat SPREADSHEET_ID', origen.idPropietat ? 'OK' : 'ERROR', origen.idPropietat ? 'configurada'
+      : 'falta: afegiu-la a les Propietats de l\'script (o instal·leu el programa des del full: Extensions › Apps Script)');
   }
+
+  var ubicacio = Config.ubicacioClau();
+  if (!ubicacio) {
+    afegeix('Clau de Gemini', 'ERROR', 'falta: deseu-la amb Rèplica › Configuració › Desa la clau de Gemini ' +
+      '(o afegiu la propietat GEMINI_API_KEY a les Propietats de l\'script)');
+  } else if (ubicacio === Config.UBICACIONS_CLAU.USUARI) {
+    afegeix('Clau de Gemini', 'OK', 'desada al compte de prova (no es veu a Configuració del projecte)');
+  } else if (origen.vinculat) {
+    afegeix('Clau de Gemini', 'AVÍS', 'és a les Propietats de l\'script, on la pot veure qualsevol persona que pugui editar ' +
+      'el full. Per amagar-la, feu Rèplica › Configuració › Desa la clau de Gemini');
+  } else {
+    afegeix('Clau de Gemini', 'OK', 'configurada (Propietats de l\'script)');
+  }
+
+  var conf = Config.llegeix();
+  var actius = [];
   afegeix('Interruptor global', 'INFO', conf.simulacioActivada ? 'SIMULATION_ENABLED=true (processament actiu)' : 'SIMULATION_ENABLED=false (no es processa ni s\'envia res)');
 
   [Config.PROPIETATS.PROVA_PARTICIPANT, Config.PROPIETATS.PROVA_ESCENARI].forEach(function (nom) {
     if (Config.propietat(nom)) {
-      afegeix('Propietat ' + nom, 'AVÍS', 'ja no s\'utilitza (ara és a la pestanya Configuració): podeu esborrar-la');
+      afegeix('Propietat ' + nom, 'AVÍS', 'ja no s\'utilitza (ara és a la pestanya Activacions): podeu esborrar-la');
     }
   });
+  if (Config.propietat(Config.PROPIETATS.REMITENTS)) {
+    afegeix('Propietat ALLOWED_SENDERS', 'AVÍS', 'ja no s\'utilitza (ara és la pestanya Participants): podeu esborrar-la');
+  }
 
-  if (conf.spreadsheetId) {
+  if (origen.vinculat || origen.idPropietat) {
     try {
       Repositori.diagnostica().forEach(function (d) {
         if (!d.existeix) {
-          afegeix('Pestanya ' + d.pestanya, 'ERROR', 'no existeix: executa preparaFulls()');
+          afegeix('Pestanya ' + d.pestanya, 'ERROR', 'no existeix: ' + FES_PREPARA_);
         } else if (d.columnesQueFalten.length) {
-          afegeix('Pestanya ' + d.pestanya, 'ERROR', 'falten columnes: ' + d.columnesQueFalten.join(', ') + ' (executa preparaFulls())');
+          afegeix('Pestanya ' + d.pestanya, 'ERROR', 'falten columnes: ' + d.columnesQueFalten.join(', ') + ' (' + FES_PREPARA_ + ')');
         } else {
           afegeix('Pestanya ' + d.pestanya, 'OK', 'correcta');
         }
       });
-      diagnosticaParametres_(remitents).forEach(function (d) { afegeix(d[0], d[1], d[2]); });
+      diagnosticaParametres_().forEach(function (d) { afegeix(d[0], d[1], d[2]); });
+      diagnosticaParticipants_().forEach(function (d) { afegeix(d[0], d[1], d[2]); });
+      actius = Repositori.participantsActius();
     } catch (e) {
       afegeix('Google Sheets', 'ERROR', 'no s\'hi pot accedir: ' + Registre.resumError(e));
     }
@@ -1210,8 +1339,8 @@ function comprovaConfiguracio(ometGemini) {
   try {
     var gmail = Bustia.diagnostica();
     afegeix('Gmail', 'OK', 'accés correcte a la bústia ' + Registre.emmascaraCorreu(gmail.adreca));
-    if (remitents.indexOf(Config.normalitzaCorreu(gmail.adreca)) !== -1) {
-      afegeix('ALLOWED_SENDERS', 'ERROR', 'inclou la mateixa bústia de prova; treu-la per evitar bucles');
+    if (actius.indexOf(Config.normalitzaCorreu(gmail.adreca)) !== -1) {
+      afegeix('Participants', 'ERROR', 'inclou la mateixa bústia de prova; desmarqueu-la o esborreu-la per evitar bucles');
     }
   } catch (e) {
     afegeix('Gmail', 'ERROR', 'sense accés: ' + Registre.resumError(e));
@@ -1229,10 +1358,10 @@ function comprovaConfiguracio(ometGemini) {
   var disparadors = Disparador.compta();
   var aplicat = Disparador.intervalAplicat();
   afegeix('Disparador', disparadors === 1 && aplicat ? 'OK' : disparadors === 1 ? 'AVÍS' : (disparadors === 0 ? 'AVÍS' : 'ERROR'),
-    disparadors === 0 ? 'no n\'hi ha cap: executa creaDisparador()' :
-      disparadors > 1 ? disparadors + ' disparadors: executa creaDisparador() perquè en quedi un de sol' :
+    disparadors === 0 ? 'no n\'hi ha cap: ' + FES_DISPARADOR_ :
+      disparadors > 1 ? disparadors + ' disparadors: ' + FES_DISPARADOR_ + ' perquè en quedi un de sol' :
         aplicat ? 'revisió cada ' + aplicat + ' minut(s)'
-          : 'interval desconegut (creat amb una versió anterior): executeu creaDisparador per actualitzar-lo');
+          : 'interval desconegut (creat amb una versió anterior): ' + FES_DISPARADOR_);
 
   var correcte = diagnostics.every(function (d) { return d.estat !== 'ERROR'; });
   var text = diagnostics.map(function (d) {
@@ -1242,8 +1371,30 @@ function comprovaConfiguracio(ometGemini) {
   return { correcte: correcte, diagnostics: diagnostics, text: text };
 }
 
+var FES_PREPARA_ = 'feu Rèplica › Configuració › Prepara el full (o executeu preparaFulls)';
+var FES_DISPARADOR_ = 'feu Rèplica › Revisió automàtica › Crea o actualitza (o executeu creaDisparador)';
+
+/** Diagnòstic de la pestanya Participants: llista de [element, estat, detall]. */
+function diagnosticaParticipants_() {
+  var resultat = [];
+  var llista = Repositori.participants();
+  llista.filter(function (p) { return !Config.esCorreuValid(p.correu); }).forEach(function (p) {
+    resultat.push(['Participants › fila ' + p.fila, 'ERROR', 'l\'adreça no és vàlida']);
+  });
+  var actius = Repositori.participantsActius().length;
+  if (actius === 0) {
+    resultat.push(['Participants', 'ERROR', llista.length === 0
+      ? 'no hi ha cap participant: escriviu les adreces a la pestanya Participants i marqueu la casella actiu'
+      : 'cap participant té marcada la casella actiu']);
+  } else {
+    resultat.push(['Participants', 'OK', actius + ' participant(s) actiu(s)' +
+      (llista.length > actius ? ' i ' + (llista.length - actius) + ' inactiu(s) o no vàlid(s)' : '')]);
+  }
+  return resultat;
+}
+
 /** Diagnòstic de la pestanya Configuració: llista de [element, estat, detall]. */
-function diagnosticaParametres_(remitents) {
+function diagnosticaParametres_() {
   var resultat = [];
   var conf = Repositori.configuracio();
   conf.errors.forEach(function (e) {
@@ -1253,57 +1404,155 @@ function diagnosticaParametres_(remitents) {
   if (!conf.errors.some(function (e) { return e.clau === 'Configuració'; })) {
     resultat.push(['Configuració › interval_minuts', 'INFO', v.intervalMinuts + ' minut(s)' +
       (Disparador.compta() > 0 && Disparador.intervalAplicat() !== v.intervalMinuts
-        ? ' (s\'aplicarà a la propera revisió automàtica, o ara mateix si executeu creaDisparador)' : '')]);
-    var escenari = Repositori.escenari(v.escenari);
-    resultat.push(['Configuració › escenari', escenari && escenari.actiu ? 'OK' : 'ERROR',
-      !escenari ? v.escenari + ' no existeix a la pestanya Escenaris' :
-        !escenari.actiu ? v.escenari + ' no està actiu (columna actiu)' : v.escenari + ' (' + escenari.titol + ')']);
-    var p = v.participants;
-    if (p.length === 0) {
-      resultat.push(['Configuració › participant', 'AVÍS', 'buit: cal per iniciar simulacions amb provaIniciaSimulacio()']);
-    } else if (p.length > 1) {
-      resultat.push(['Configuració › participant', 'ERROR', 'conté ' + p.length + ' adreces; ha de contenir una sola adreça (la llista completa va a ALLOWED_SENDERS)']);
-    } else if (!Config.esCorreuValid(p[0])) {
-      resultat.push(['Configuració › participant', 'ERROR', 'l\'adreça no és vàlida']);
-    } else if (remitents.indexOf(p[0]) === -1) {
-      resultat.push(['Configuració › participant', 'ERROR', Registre.emmascaraCorreu(p[0]) + ' no és a ALLOWED_SENDERS: afegiu-la-hi']);
-    } else {
-      resultat.push(['Configuració › participant', 'OK', Registre.emmascaraCorreu(p[0]) + ' (també és a ALLOWED_SENDERS)']);
-    }
+        ? ' (s\'aplicarà a la propera revisió automàtica, o ara mateix si ' + FES_DISPARADOR_ + ')' : '')]);
     resultat.push(['Configuració › max_torns_per_defecte', 'INFO', v.maxTornsPerDefecte + ' respostes']);
+    var correus = Simulacio.correusDisponibles();
+    resultat.push(['Configuració › correus_per_dia', correus.restants > 0 ? 'INFO' : 'AVÍS', correus.limit +
+      ' correus en 24 hores; se n\'han enviat ' + correus.enviats + ' i en queden ' + correus.restants]);
   }
   return resultat;
 }
 
-/** Inicia una simulació: envia el missatge inicial al participant. */
+/** Inicia una simulació amb una sola persona (sense activació). */
 function iniciaSimulacio(correuParticipant, idEscenari) {
   if (!correuParticipant) {
-    throw new Error('Cal indicar l\'adreça del participant. Des de l\'editor, fes servir provaIniciaSimulacio().');
+    throw new Error('Cal indicar l\'adreça del participant. Des de l\'editor, fes servir enviaActivacioPendent().');
   }
+  Compte.exigeix();
   return Simulacio.inicia(correuParticipant, idEscenari || 'ESC-001');
 }
 
 /**
- * Funció per a l'editor: inicia una simulació amb el participant i
- * l'escenari indicats a la pestanya Configuració. Així no cal escriure
- * cap adreça real al codi.
+ * Comprova una fila d'Activacions sense enviar res. Retorna { error } amb
+ * el motiu, o { escenari, aEnviar, omesos: [{ correu, motiu }] }.
+ * No s'envia res si alguna adreça no és correcta.
  */
-function provaIniciaSimulacio() {
-  var v = Repositori.configuracio().valors;
-  if (v.participants.length === 0) {
-    throw new Error('Escriviu l\'adreça del docent participant a la pestanya Configuració (fila participant).');
+function revisaActivacio_(a) {
+  var E = Repositori.ESTATS_ACTIVACIO;
+  if (a.estat === E.ENVIADA) {
+    return { error: 'Aquesta activació (' + a.id_activacio + ') ja s\'ha enviat. Per enviar el correu inicial a més ' +
+      'persones, afegiu una fila nova a la pestanya Activacions.' };
   }
-  if (v.participants.length > 1) {
-    throw new Error('La fila participant de la pestanya Configuració ha de contenir una sola adreça (la del ' +
-      'docent amb qui inicieu aquesta simulació). La llista de tots els participants va a ALLOWED_SENDERS.');
+  if (!Config.llegeix().simulacioActivada) {
+    return { error: 'Les simulacions estan aturades. Quan el coordinador ho confirmi, activeu-les amb ' +
+      'Rèplica › Simulacions ATURADES · Activa-les, i torneu a enviar l\'activació.' };
   }
-  var resultat = iniciaSimulacio(v.participants[0], v.escenari);
-  Registre.info('Conversa creada', resultat);
-  return resultat;
+  if (!a.escenari) return { error: 'Trieu l\'escenari a la columna escenari de la fila.' };
+  var escenari = Repositori.escenari(a.escenari);
+  if (!escenari) return { error: 'L\'escenari ' + a.escenari + ' no existeix a la pestanya Escenaris.' };
+  if (!escenari.actiu) return { error: 'L\'escenari ' + a.escenari + ' no està actiu (columna actiu de la pestanya Escenaris).' };
+
+  var destinataris = a.destinataris.filter(function (c, i, llista) { return llista.indexOf(c) === i; });
+  if (destinataris.length === 0) {
+    return { error: 'Escriviu almenys una adreça a la columna destinataris (diverses, separades per comes o una per línia).' };
+  }
+  var maxim = Config.LIMITS.MAX_DESTINATARIS_PER_ACTIVACIO;
+  if (destinataris.length > maxim) {
+    return { error: 'Una activació pot tenir com a màxim ' + maxim + ' destinataris; aquesta en té ' + destinataris.length + '.' };
+  }
+  var noValides = destinataris.filter(function (c) { return !Config.esCorreuValid(c); });
+  if (noValides.length) {
+    return { error: 'Aquestes adreces no són vàlides (reviseu que no hi faltin lletres ni l\'@):\n• ' + noValides.join('\n• ') +
+      '\n\nNo s\'ha enviat res.' };
+  }
+  var actius = Repositori.participantsActius();
+  var foraDeLlista = destinataris.filter(function (c) { return actius.indexOf(c) === -1; });
+  if (foraDeLlista.length) {
+    return { error: 'Aquestes adreces no són a la pestanya Participants, o no hi tenen marcada la casella actiu:\n• ' +
+      foraDeLlista.join('\n• ') + '\n\nAfegiu-les-hi (o corregiu-les) i torneu-ho a provar. No s\'ha enviat res.' };
+  }
+  var propies = Bustia.adrecesPropies();
+  var propia = destinataris.filter(function (c) { return propies.indexOf(c) !== -1; });
+  if (propia.length) return { error: 'La bústia de prova no pot ser destinatària: ' + propia.join(', ') + '. No s\'ha enviat res.' };
+
+  var converses = Repositori.converses();
+  var omesos = [];
+  var aEnviar = destinataris.filter(function (correu) {
+    var seves = converses.filter(function (c) { return c.correu_participant === correu; });
+    if (a.id_activacio && seves.some(function (c) { return c.id_activacio === a.id_activacio; })) {
+      omesos.push({ correu: correu, motiu: 'ja l\'havia rebut en aquesta activació' });
+      return false;
+    }
+    if (seves.some(function (c) { return c.id_escenari === escenari.id && c.estat !== Repositori.ESTATS_CONVERSA.FINALITZADA; })) {
+      omesos.push({ correu: correu, motiu: 'ja té una conversa oberta d\'aquest escenari' });
+      return false;
+    }
+    return true;
+  });
+  var correus = Simulacio.correusDisponibles();
+  if (aEnviar.length > correus.restants) {
+    return { error: 'Aquesta activació enviaria ' + aEnviar.length + ' correus, però en les properes hores només en ' +
+      'queden ' + correus.restants + ' (límit de ' + correus.limit + ' en 24 hores, fila correus_per_dia de la pestanya ' +
+      'Configuració). Envieu-la més tard o repartiu els destinataris en dues activacions.' };
+  }
+  return { escenari: escenari, aEnviar: aEnviar, omesos: omesos };
 }
 
-/** Funció del disparador temporal. */
+/**
+ * Envia el correu inicial a cada destinatari d'una activació (un fil per
+ * persona) i escriu el resultat a la fila. Retorna
+ * { idActivacio, estat, enviats, omesos, errors }.
+ */
+function enviaActivacio_(a) {
+  Compte.exigeix();
+  var revisio = revisaActivacio_(a);
+  if (revisio.error) throw new Error(revisio.error);
+  var id = a.id_activacio || Repositori.seguentIdActivacio();
+  if (!a.id_activacio) Repositori.actualitzaActivacio(a.fila, { id_activacio: id });
+
+  var enviats = [];
+  var errors = [];
+  revisio.aEnviar.forEach(function (correu) {
+    try {
+      Simulacio.inicia(correu, revisio.escenari.id, id);
+      enviats.push(correu);
+    } catch (e) {
+      errors.push({ correu: correu, motiu: Registre.resumError(e) });
+    }
+  });
+
+  var estat = errors.length ? Repositori.ESTATS_ACTIVACIO.PARCIAL : Repositori.ESTATS_ACTIVACIO.ENVIADA;
+  var parts = [enviats.length + ' enviat(s)'];
+  if (revisio.omesos.length) {
+    parts.push(revisio.omesos.length + ' omès/omesos: ' + revisio.omesos.map(function (o) { return o.correu + ' (' + o.motiu + ')'; }).join('; '));
+  }
+  if (errors.length) {
+    parts.push(errors.length + ' amb error: ' + errors.map(function (o) { return o.correu + ' (' + o.motiu + ')'; }).join('; '));
+  }
+  Repositori.actualitzaActivacio(a.fila, {
+    estat: estat,
+    data_enviament: Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'dd/MM/yyyy HH:mm'),
+    resultat: parts.join(' · ')
+  });
+  Registre.info('Activació enviada', { idActivacio: id, estat: estat, enviats: enviats.length, omesos: revisio.omesos.length, errors: errors.length });
+  return { idActivacio: id, estat: estat, enviats: enviats, omesos: revisio.omesos, errors: errors };
+}
+
+/**
+ * Funció per a l'editor (instal·lació sense menú): envia la primera fila de
+ * la pestanya Activacions que encara no s'ha enviat.
+ */
+function enviaActivacioPendent() {
+  var pendents = Repositori.activacions().filter(function (a) { return a.estat === ''; });
+  if (pendents.length === 0) {
+    throw new Error('No hi ha cap activació per enviar: afegiu una fila a la pestanya Activacions (escenari i destinataris).');
+  }
+  return enviaActivacio_(pendents[0]);
+}
+
+/**
+ * Funció del disparador temporal (i de Rèplica › Revisa ara). Un disparador
+ * s'executa amb el compte de qui el va crear: si no és el compte de prova,
+ * no es llegeix ni s'envia res.
+ */
 function processaCorreusPendents() {
+  if (Config.llegeix().simulacioActivada) {
+    var compte = Compte.comprova();
+    if (!compte.correcte) {
+      Registre.error('Revisió omesa: ' + compte.missatge);
+      return { estat: 'COMPTE_INCORRECTE', missatge: compte.missatge };
+    }
+  }
   return Simulacio.processaPendents();
 }
 
@@ -1334,6 +1583,7 @@ function generaResposta(context) {
  * la pestanya, perquè la revisió automàtica no el desfaci.
  */
 function creaDisparador(minuts) {
+  Compte.exigeix();
   var interval;
   if (minuts !== undefined && minuts !== null && minuts !== '') {
     interval = Number(minuts);
@@ -1346,6 +1596,7 @@ function creaDisparador(minuts) {
   }
   Disparador.crea(interval);
   Registre.info('Disparador creat: processaCorreusPendents cada ' + interval + ' minut(s).');
+  return interval;
 }
 
 /** Elimina els disparadors de processaCorreusPendents. */
@@ -1400,6 +1651,57 @@ var Disparador = (function () {
   return { compta: compta, elimina: elimina, crea: crea, intervalAplicat: intervalAplicat, sincronitza: sincronitza };
 })();
 
+/**
+ * Comprova que el programa s'executa amb el compte de prova. Les opcions
+ * del menú s'executen amb el compte de qui hi fa clic, i un disparador amb
+ * el de qui el va crear; si fos un altre compte, els correus sortirien del
+ * seu Gmail. El compte de prova és el propietari del full de càlcul: no cal
+ * configurar res, i només el propietari pot canviar-lo.
+ */
+var Compte = (function () {
+  function resultat_(correcte, actual, propietari, missatge) {
+    return { correcte: correcte, actual: actual, propietari: propietari, missatge: missatge || '' };
+  }
+
+  function comprova() {
+    var actual = '';
+    try {
+      actual = Config.normalitzaCorreu(Session.getEffectiveUser().getEmail());
+    } catch (e) { /* queda buit */ }
+    var propietari = '';
+    try {
+      var usuari = Repositori.llibre().getOwner();
+      propietari = usuari ? Config.normalitzaCorreu(usuari.getEmail()) : '';
+    } catch (e) {
+      return resultat_(false, actual, '', 'No s\'ha pogut obrir el full de càlcul: ' + Registre.resumError(e));
+    }
+    if (!propietari) {
+      return resultat_(false, actual, '', 'No es pot saber de qui és el full de càlcul (passa, per exemple, si és en una ' +
+        'unitat compartida). Rèplica necessita un full creat amb el compte de prova, a «El meu Drive» d\'aquest compte.');
+    }
+    if (!actual) {
+      return resultat_(false, '', propietari, 'No es pot saber amb quin compte s\'executa el programa. ' +
+        'Torneu-ho a provar havent entrat amb el compte de prova (' + propietari + ').');
+    }
+    if (actual !== propietari) {
+      return resultat_(false, actual, propietari, 'Només el compte de prova (' + propietari + '), que és el propietari ' +
+        'del full, pot fer servir Rèplica. Ara s\'està fent servir el compte ' + actual + '. Si continuéssiu, els correus ' +
+        'sortirien d\'aquest compte.\n\nObriu el full havent entrat amb el compte de prova (per exemple, en una finestra ' +
+        'd\'incògnit).');
+    }
+    return resultat_(true, actual, propietari);
+  }
+
+  /** Llança un error llegible si no és el compte de prova. */
+  function exigeix() {
+    var r = comprova();
+    if (!r.correcte) throw new Error(r.missatge);
+    return r;
+  }
+
+  return { comprova: comprova, exigeix: exigeix };
+})();
+
 /** Torna a ACTIVA una conversa en ERROR (després de revisar-la). */
 function reactivaConversa(idConversa) {
   return Simulacio.reactiva(idConversa);
@@ -1410,7 +1712,7 @@ function tancaConversa(idConversa) {
   return Simulacio.tanca(idConversa);
 }
 
-/** Resum de l'estat de les converses, per supervisar des de l'editor. */
+/** Resum de l'estat de les converses (adreces emmascarades). */
 function estatSimulacions() {
   var converses = Repositori.converses();
   var resum = { ACTIVA: 0, PROCESSANT: 0, FINALITZADA: 0, ERROR: 0 };
@@ -1420,8 +1722,389 @@ function estatSimulacions() {
       ' · ' + c.estat + ' · torns ' + c.torns_ia + (c.darrer_error ? ' · ' + c.darrer_error : '');
   });
   Registre.info('Converses: ' + JSON.stringify(resum) + (linies.length ? '\n' + linies.join('\n') : ''));
-  return { resum: resum, simulacioActivada: Config.llegeix().simulacioActivada };
+
+  var activada = Config.llegeix().simulacioActivada;
+  var disparadors = Disparador.compta();
+  var obertes = converses.filter(function (c) { return c.estat !== 'FINALITZADA'; });
+  var MAX_LINIES = 15;
+  var text = 'Simulacions: ' + (activada ? 'ACTIVADES' : 'ATURADES (no es respon ni s\'envia res)') + '\n' +
+    'Revisió automàtica: ' + (disparadors === 0 ? 'no n\'hi ha'
+      : 'cada ' + (Disparador.intervalAplicat() || '?') + ' minut(s)') + '\n\n' +
+    'Converses: ' + resum.ACTIVA + ' actives · ' + resum.PROCESSANT + ' processant · ' +
+    resum.ERROR + ' en error · ' + resum.FINALITZADA + ' finalitzades';
+  if (obertes.length) {
+    text += '\n\nConverses no finalitzades:\n' + obertes.slice(0, MAX_LINIES).map(function (c) {
+      return '• ' + c.id_conversa + ' · ' + Registre.emmascaraCorreu(c.correu_participant) + ' · ' + c.estat +
+        ' · ' + c.torns_ia + ' resposta(es)' + (c.darrer_error ? '\n   Error: ' + Registre.sanititza(c.darrer_error) : '');
+    }).join('\n');
+    if (obertes.length > MAX_LINIES) text += '\n… i ' + (obertes.length - MAX_LINIES) + ' més (vegeu la pestanya Converses).';
+  }
+  return { resum: resum, simulacioActivada: activada, text: text };
 }
+
+// ===== src/Menu.js =====
+
+/**
+ * Menú «Rèplica» del full de càlcul. Només funciona si el projecte està
+ * vinculat al full (instal·lat des d'Extensions › Apps Script).
+ *
+ * - onOpen és un activador simple: s'executa sense autorització i només
+ *   construeix el menú. Si no pot llegir l'interruptor, mostra les dues
+ *   opcions (activar i aturar).
+ * - Cada opció s'executa amb el compte de qui hi fa clic. Abans de fer res,
+ *   comprova que és el compte de prova (Compte.comprova) i, si no, ho explica.
+ * - Els resultats i els errors es mostren en un quadre de diàleg en català.
+ *   Les adreces dels registres i dels errors surten emmascarades.
+ */
+var Menu = (function () {
+  var TITOL_MENU = 'Rèplica';
+
+  /** Construeix (o reconstrueix) el menú. */
+  function crea() {
+    var ui = SpreadsheetApp.getUi();
+    var activada = null;
+    try {
+      activada = Config.llegeix().simulacioActivada;
+    } catch (e) { /* activador simple sense accés a les propietats */ }
+
+    var menu = ui.createMenu(TITOL_MENU)
+      .addItem('Envia l\'activació seleccionada…', 'menuEnviaActivacio')
+      .addItem('Revisa ara les respostes', 'menuRevisaAra')
+      .addSeparator()
+      .addItem('Atura la conversa seleccionada…', 'menuAturaConversa')
+      .addItem('Reactiva la conversa seleccionada…', 'menuReactivaConversa')
+      .addItem('Estat de les converses', 'menuEstatConverses')
+      .addSeparator();
+    if (activada === true) {
+      menu.addItem('Simulacions ACTIVADES · Atura-les totes…', 'menuAturaSimulacions');
+    } else if (activada === false) {
+      menu.addItem('Simulacions ATURADES · Activa-les…', 'menuActivaSimulacions');
+    } else {
+      menu.addItem('Activa les simulacions…', 'menuActivaSimulacions')
+        .addItem('Atura totes les simulacions…', 'menuAturaSimulacions');
+    }
+    menu.addSubMenu(ui.createMenu('Revisió automàtica')
+      .addItem('Crea o actualitza', 'menuCreaDisparador')
+      .addItem('Elimina…', 'menuEliminaDisparadors'))
+      .addSubMenu(ui.createMenu('Configuració')
+        .addItem('Comprova la configuració', 'menuComprovaConfiguracio')
+        .addItem('Prepara el full', 'menuPreparaFull')
+        .addItem('Desa la clau de Gemini…', 'menuDesaClauGemini'))
+      .addToUi();
+  }
+
+  /**
+   * Cert només si se sap segur que qui obre el full no és el compte de
+   * prova. En un activador simple, Google sovint no dona l'adreça (comptes
+   * de Gmail): llavors el menú es mostra i la comprovació es fa en clicar.
+   */
+  function esUnAltreCompte() {
+    try {
+      var actual = Config.normalitzaCorreu(Session.getActiveUser().getEmail());
+      var usuari = SpreadsheetApp.getActiveSpreadsheet().getOwner();
+      var propietari = usuari ? Config.normalitzaCorreu(usuari.getEmail()) : '';
+      return actual !== '' && propietari !== '' && actual !== propietari;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  /**
+   * Executa una opció del menú: comprova el codi i el compte, i mostra
+   * qualsevol error en un diàleg. `accio(ui)` mostra el seu propi resultat.
+   */
+  function executa(titol, accio) {
+    var ui = SpreadsheetApp.getUi();
+    try {
+      exigeixModuls_();
+      var compte = Compte.comprova();
+      if (!compte.correcte) {
+        avisa_(ui, titol, Registre.sanititza(compte.missatge));
+        return;
+      }
+      accio(ui);
+    } catch (e) {
+      avisa_(ui, titol, 'No s\'ha pogut completar.\n\n' + Registre.sanititza(e && e.message ? e.message : String(e)));
+    }
+  }
+
+  function avisa_(ui, titol, text) {
+    ui.alert(titol, text, ui.ButtonSet.OK);
+  }
+
+  function confirma_(ui, titol, text) {
+    return ui.alert(titol, text, ui.ButtonSet.YES_NO) === ui.Button.YES;
+  }
+
+  // ---------------------------------------------------------- Opcions
+
+  // Noms diferents de les funcions globals que criden (preparaFulls...):
+  // una funció local amb el mateix nom les amagaria.
+  function enviaActivacio() {
+    var TITOL = 'Envia l\'activació seleccionada';
+    executa(TITOL, function (ui) {
+      var llibre = SpreadsheetApp.getActiveSpreadsheet();
+      var rang = llibre ? llibre.getActiveRange() : null;
+      var sel = Repositori.activacioDeLaSeleccio(rang ? rang.getSheet() : null, rang);
+      if (sel.error) {
+        avisa_(ui, TITOL, sel.error);
+        return;
+      }
+      var a = sel.activacio;
+      // Es mostren les adreces completes: cal saber exactament quina falla.
+      var revisio = revisaActivacio_(a);
+      if (revisio.error) {
+        avisa_(ui, TITOL, revisio.error);
+        return;
+      }
+      var textOmesos = revisio.omesos.length ? '\n\nNo s\'enviarà a:\n' + revisio.omesos.map(function (o) {
+        return '• ' + o.correu + ' (' + o.motiu + ')';
+      }).join('\n') : '';
+      if (revisio.aEnviar.length === 0) {
+        avisa_(ui, TITOL, 'No cal enviar res.' + textOmesos);
+        return;
+      }
+      var text = 'Activació: ' + (a.id_activacio || 'nova (fila ' + a.fila + ')') + '\n' +
+        'Escenari: ' + revisio.escenari.id + ' · ' + revisio.escenari.titol + '\n\n' +
+        'S\'enviarà el correu inicial de la clienta a ' + revisio.aEnviar.length + ' persona(es), cadascuna en un ' +
+        'fil separat (ningú no veu les altres adreces):\n• ' + revisio.aEnviar.join('\n• ') + textOmesos +
+        '\n\nVoleu enviar-lo?';
+      if (!confirma_(ui, TITOL, text)) return;
+      var r = enviaActivacio_(a);
+      var resum = (r.errors.length ? 'Enviament incomplet.' : 'Fet.') + '\n\nActivació: ' + r.idActivacio +
+        '\nCorreus enviats: ' + r.enviats.length;
+      if (r.errors.length) {
+        resum += '\n\nNo s\'ha pogut enviar a:\n' + r.errors.map(function (o) {
+          return '• ' + o.correu + ': ' + o.motiu;
+        }).join('\n') + '\n\nQuan ho hàgiu resolt, torneu a enviar la mateixa fila: només s\'enviarà a qui falti.';
+      }
+      resum += '\n\nEl resultat també és a la fila de l\'activació (columna resultat), i les converses noves, ' +
+        'a la pestanya Converses.';
+      avisa_(ui, TITOL, resum);
+    });
+  }
+
+  function revisaAra() {
+    var TITOL = 'Revisa ara les respostes';
+    executa(TITOL, function (ui) {
+      var r = processaCorreusPendents();
+      var text;
+      if (r.estat === 'DESACTIVADA') {
+        text = 'Les simulacions estan aturades: no s\'ha revisat res.';
+      } else if (r.estat === 'BLOQUEJAT') {
+        text = 'Ara mateix hi ha una altra revisió en curs. Torneu-ho a provar d\'aquí a un minut.';
+      } else if (r.estat === 'COMPTE_INCORRECTE') {
+        text = Registre.sanititza(r.missatge);
+      } else if (r.revisades === 0) {
+        text = 'No hi ha cap conversa activa.';
+      } else {
+        text = 'Revisió feta.\n\nConverses revisades: ' + r.revisades + '\nRespostes enviades: ' + r.respostes +
+          (r.errors ? '\nConverses amb error: ' + r.errors + ' (vegeu la columna darrer_error de la pestanya Converses)' : '') +
+          (r.ajornades ? '\nPendents per a la propera revisió: ' + r.ajornades : '') +
+          (r.limitDiari ? '\n\nRespostes en espera pel límit de correus diari: ' + r.limitDiari + '. S\'enviaran ' +
+            'soles quan hi torni a haver marge (fila correus_per_dia de la pestanya Configuració).' : '');
+      }
+      avisa_(ui, TITOL, text);
+    });
+  }
+
+  /** Conversa de la fila seleccionada, o null després d'explicar què cal fer. */
+  function conversaSeleccionada_(ui, titol) {
+    var llibre = SpreadsheetApp.getActiveSpreadsheet();
+    var rang = llibre ? llibre.getActiveRange() : null;
+    var r = Repositori.conversaDeLaSeleccio(rang ? rang.getSheet() : null, rang);
+    if (r.error) {
+      avisa_(ui, titol, r.error);
+      return null;
+    }
+    return r.conversa;
+  }
+
+  function descriuConversa_(c) {
+    return 'Conversa: ' + c.id_conversa + '\nParticipant: ' + c.correu_participant + '\nEscenari: ' + c.id_escenari +
+      '\nEstat: ' + c.estat + '\nRespostes de la clienta: ' + c.torns_ia +
+      (c.darrer_error ? '\nDarrer error: ' + Registre.sanititza(c.darrer_error) : '');
+  }
+
+  function aturaConversa() {
+    var TITOL = 'Atura la conversa seleccionada';
+    executa(TITOL, function (ui) {
+      var c = conversaSeleccionada_(ui, TITOL);
+      if (!c) return;
+      if (c.estat === Repositori.ESTATS_CONVERSA.FINALITZADA) {
+        avisa_(ui, TITOL, 'Aquesta conversa ja està finalitzada: no cal fer res.\n\n' + descriuConversa_(c));
+        return;
+      }
+      if (!confirma_(ui, TITOL, descriuConversa_(c) + '\n\nLa conversa passarà a FINALITZADA sense enviar cap ' +
+          'comiat. Si el participant hi torna a respondre, no rebrà resposta.\n\nVoleu aturar-la?')) return;
+      tancaConversa(c.id_conversa);
+      avisa_(ui, TITOL, 'Conversa ' + c.id_conversa + ' aturada (FINALITZADA).');
+    });
+  }
+
+  function reactivaConversaSeleccionada() {
+    var TITOL = 'Reactiva la conversa seleccionada';
+    executa(TITOL, function (ui) {
+      var c = conversaSeleccionada_(ui, TITOL);
+      if (!c) return;
+      if (c.estat !== Repositori.ESTATS_CONVERSA.ERROR) {
+        avisa_(ui, TITOL, 'Només es poden reactivar les converses en estat ERROR. Aquesta és en estat ' + c.estat +
+          '.\n\n' + descriuConversa_(c));
+        return;
+      }
+      if (!confirma_(ui, TITOL, descriuConversa_(c) + '\n\nABANS DE CONTINUAR: obriu el fil a la bústia de prova ' +
+          '(Gmail) i comproveu que la darrera resposta de la clienta NO s\'ha enviat.\n' +
+          '• Si no s\'ha enviat: reactiveu-la, i la clienta respondrà a la propera revisió.\n' +
+          '• Si sí que s\'ha enviat: no la reactiveu (es duplicaria). Feu servir «Atura la conversa seleccionada».\n\n' +
+          'Voleu reactivar-la?')) return;
+      reactivaConversa(c.id_conversa);
+      avisa_(ui, TITOL, 'Conversa ' + c.id_conversa + ' reactivada (ACTIVA). La clienta respondrà a la propera ' +
+        'revisió automàtica, o ara mateix si feu Rèplica › Revisa ara les respostes.');
+    });
+  }
+
+  function estatConverses() {
+    var TITOL = 'Estat de les converses';
+    executa(TITOL, function (ui) {
+      avisa_(ui, TITOL, estatSimulacions().text);
+    });
+  }
+
+  function activa() {
+    var TITOL = 'Activa les simulacions';
+    executa(TITOL, function (ui) {
+      if (Config.llegeix().simulacioActivada) {
+        avisa_(ui, TITOL, 'Les simulacions ja estaven activades.');
+        crea();
+        return;
+      }
+      if (!confirma_(ui, TITOL, 'Feu-ho només quan el coordinador ho hagi confirmat.\n\nA partir d\'ara, la clienta ' +
+          'respondrà automàticament als participants i es podran iniciar simulacions noves.\n\nVoleu activar-les?')) return;
+      activaSimulacions();
+      crea();
+      avisa_(ui, TITOL, 'Simulacions activades.' + (Disparador.compta() === 0
+        ? '\n\nAtenció: encara no hi ha revisió automàtica, i les respostes no arribaran soles. Creeu-la amb ' +
+          'Rèplica › Revisió automàtica › Crea o actualitza.' : ''));
+    });
+  }
+
+  function atura() {
+    var TITOL = 'Atura totes les simulacions';
+    executa(TITOL, function (ui) {
+      if (!confirma_(ui, TITOL, 'S\'aturarà tot de seguida: no es respondrà a ningú ni es podran iniciar simulacions ' +
+          'noves fins que les torneu a activar. Les converses no es perden.\n\nVoleu aturar-ho tot?')) return;
+      aturaSimulacions();
+      crea();
+      avisa_(ui, TITOL, 'Simulacions aturades. Per tornar-les a engegar: Rèplica › Simulacions ATURADES · Activa-les.');
+    });
+  }
+
+  function creaRevisio() {
+    var TITOL = 'Revisió automàtica';
+    executa(TITOL, function (ui) {
+      var interval = creaDisparador();
+      avisa_(ui, TITOL, 'Revisió automàtica creada: la bústia es revisarà cada ' + interval + ' minut(s).\n\n' +
+        'Per canviar-ho, trieu un altre valor a interval_minuts (pestanya Configuració): s\'aplica sol.' +
+        (Config.llegeix().simulacioActivada ? ''
+          : '\n\nRecordeu que, mentre les simulacions estiguin aturades, la revisió no fa res.'));
+    });
+  }
+
+  function eliminaRevisio() {
+    var TITOL = 'Elimina la revisió automàtica';
+    executa(TITOL, function (ui) {
+      if (!confirma_(ui, TITOL, 'La bústia deixarà de revisar-se sola i les clientes no respondran fins que la ' +
+          'torneu a crear.\n\nVoleu eliminar-la?')) return;
+      var n = eliminaDisparadors();
+      avisa_(ui, TITOL, n ? 'Revisió automàtica eliminada.' : 'No hi havia cap revisió automàtica.');
+    });
+  }
+
+  function comprova() {
+    executa('Comprova la configuració', function (ui) {
+      var r = comprovaConfiguracio();
+      avisa_(ui, r.correcte ? 'Configuració correcta' : 'Cal corregir alguna cosa',
+        (r.correcte ? 'Tot correcte. Les línies [AVÍS] i [INFO] són informatives.\n\n'
+          : 'Corregiu les línies [ERROR] i torneu a comprovar-ho.\n\n') + r.text);
+    });
+  }
+
+  function preparaFull() {
+    executa('Prepara el full', function (ui) {
+      var canvis = preparaFulls();
+      avisa_(ui, 'Prepara el full', canvis.length ? 'Fet. Canvis:\n• ' + canvis.join('\n• ')
+        : 'Tot ja estava preparat; no s\'ha canviat res.');
+    });
+  }
+
+  function desaClauGemini() {
+    var TITOL = 'Desa la clau de Gemini';
+    executa(TITOL, function (ui) {
+      var resposta = ui.prompt(TITOL, 'Enganxeu aquí la clau de Gemini (comença per AIza…).\n\n' +
+        'Es desarà al compte de prova, on no la veuen les altres persones que editen el full. Si era a les ' +
+        'Propietats de l\'script, s\'hi esborrarà.', ui.ButtonSet.OK_CANCEL);
+      if (resposta.getSelectedButton() !== ui.Button.OK) return;
+      if (!String(resposta.getResponseText() || '').trim()) {
+        avisa_(ui, TITOL, 'No heu enganxat cap clau: no s\'ha canviat res.');
+        return;
+      }
+      var r = Config.desaClau(resposta.getResponseText());
+      var text = 'Clau desada.' + (r.esborradaDeScript ? ' S\'ha esborrat de les Propietats de l\'script.' : '');
+      if (Config.llegeix().model) {
+        try {
+          var model = Gemini.comprovaModel();
+          text += model.correcte ? '\n\nComprovació amb Gemini: correcta.'
+            : '\n\nComprovació amb Gemini: ' + Registre.sanititza(model.detall);
+        } catch (e) {
+          text += '\n\nNo s\'ha pogut comprovar amb Gemini: ' + Registre.resumError(e);
+        }
+      }
+      avisa_(ui, TITOL, text);
+    });
+  }
+
+  return {
+    crea: crea,
+    esUnAltreCompte: esUnAltreCompte,
+    executa: executa,
+    enviaActivacio: enviaActivacio,
+    revisaAra: revisaAra,
+    aturaConversa: aturaConversa,
+    reactivaConversa: reactivaConversaSeleccionada,
+    estatConverses: estatConverses,
+    activa: activa,
+    atura: atura,
+    creaRevisio: creaRevisio,
+    eliminaRevisio: eliminaRevisio,
+    comprova: comprova,
+    preparaFull: preparaFull,
+    desaClauGemini: desaClauGemini
+  };
+})();
+
+/**
+ * Activador simple: afegeix el menú «Rèplica» en obrir el full. No el mostra
+ * a qui se sap que no és el compte de prova.
+ */
+function onOpen() {
+  if (Menu.esUnAltreCompte()) return;
+  Menu.crea();
+}
+
+// Funcions que crida el menú (han de ser globals). També es poden executar
+// des de l'editor, però els diàlegs només es veuen des del full.
+function menuEnviaActivacio() { Menu.enviaActivacio(); }
+function menuRevisaAra() { Menu.revisaAra(); }
+function menuAturaConversa() { Menu.aturaConversa(); }
+function menuReactivaConversa() { Menu.reactivaConversa(); }
+function menuEstatConverses() { Menu.estatConverses(); }
+function menuActivaSimulacions() { Menu.activa(); }
+function menuAturaSimulacions() { Menu.atura(); }
+function menuCreaDisparador() { Menu.creaRevisio(); }
+function menuEliminaDisparadors() { Menu.eliminaRevisio(); }
+function menuComprovaConfiguracio() { Menu.comprova(); }
+function menuPreparaFull() { Menu.preparaFull(); }
+function menuDesaClauGemini() { Menu.desaClauGemini(); }
 
 // ===== src/PromptBuilder.js =====
 
@@ -1554,18 +2237,28 @@ var Indicacions = (function () {
 // ===== src/SheetsRepository.js =====
 
 /**
- * Accés a Google Sheets: quatre pestanyes amb capçalera a la fila 1.
+ * Accés a Google Sheets: sis pestanyes amb capçalera a la fila 1.
  *
- * Configuració conté els paràmetres operatius que el docent pot canviar
- * sense tocar codi. Els secrets i els controls de seguretat (clau, model,
- * remitents autoritzats, interruptor) continuen a Script Properties.
+ * Quin full: el de la propietat SPREADSHEET_ID si n'hi ha; si no, el full al
+ * qual està vinculat el projecte (instal·lat des d'Extensions › Apps Script).
  *
- * Les pestanyes Converses i Missatges tenen format de text pla (@) perquè
- * Sheets no converteixi dates ISO ni identificadors de Gmail en números.
+ * - Configuració: paràmetres operatius que el docent pot canviar sense tocar codi.
+ * - Participants: qui pot rebre simulacions i a qui es respon (columna actiu).
+ * - Activacions: cada fila és un enviament del correu inicial a una o més persones.
+ * - Escenaris, Converses i Missatges.
+ *
+ * Els secrets i l'interruptor general continuen a Script Properties. Els
+ * editors del full són també editors del projecte vinculat: la llista de
+ * participants és al full perquè la protecció d'ALLOWED_SENDERS ja no ho era.
+ *
+ * Les pestanyes Activacions, Converses i Missatges tenen format de text pla
+ * (@) perquè Sheets no converteixi dates ni identificadors en números.
  */
 var Repositori = (function () {
   var FULLS = {
     CONFIGURACIO: 'Configuració',
+    PARTICIPANTS: 'Participants',
+    ACTIVACIONS: 'Activacions',
     ESCENARIS: 'Escenaris',
     CONVERSES: 'Converses',
     MISSATGES: 'Missatges'
@@ -1573,6 +2266,8 @@ var Repositori = (function () {
 
   var COLUMNES = {
     'Configuració': ['clau', 'valor', 'descripcio'],
+    Participants: ['correu', 'actiu', 'notes'],
+    Activacions: ['id_activacio', 'escenari', 'destinataris', 'estat', 'data_enviament', 'resultat'],
     Escenaris: [
       'id', 'actiu', 'titol', 'interlocutor', 'empresa', 'caracter', 'incidencia',
       'objectiu_interlocutor', 'limits_reservats', 'objectiu_participant', 'criteris',
@@ -1580,7 +2275,7 @@ var Repositori = (function () {
     ],
     Converses: [
       'id_conversa', 'id_escenari', 'correu_participant', 'gmail_thread_id', 'estat',
-      'torns_ia', 'data_inici', 'data_actualitzacio', 'darrer_error'
+      'torns_ia', 'data_inici', 'data_actualitzacio', 'darrer_error', 'id_activacio'
     ],
     // respon_a i tanca_conversa amplien l'especificació: permeten saber quins
     // missatges del participant ja tenen resposta i reconciliar un enviament
@@ -1591,7 +2286,7 @@ var Repositori = (function () {
     ]
   };
 
-  var FULLS_TEXT = [FULLS.CONVERSES, FULLS.MISSATGES];
+  var FULLS_TEXT = [FULLS.ACTIVACIONS, FULLS.CONVERSES, FULLS.MISSATGES];
 
   var ESTATS_CONVERSA = {
     ACTIVA: 'ACTIVA',
@@ -1607,6 +2302,8 @@ var Repositori = (function () {
     ERROR: 'ERROR'
   };
 
+  var ESTATS_ACTIVACIO = { ENVIADA: 'ENVIADA', PARCIAL: 'PARCIAL' };
+
   var ROLS = { PARTICIPANT: 'participant', INTERLOCUTOR: 'interlocutor' };
 
   /** Paràmetres de la pestanya Configuració, amb valor inicial i explicació. */
@@ -1618,38 +2315,66 @@ var Repositori = (function () {
         'propera revisió. Amb 1 minut, feu-lo servir només durant les proves: consumeix molta quota diària.'
     },
     {
-      clau: 'escenari',
-      valor: 'ESC-001',
-      descripcio: 'Escenari (columna id de la pestanya Escenaris) que s\'utilitza en executar provaIniciaSimulacio.'
-    },
-    {
-      clau: 'participant',
-      valor: '',
-      descripcio: 'UNA SOLA adreça: el docent amb qui iniciareu la propera simulació en executar ' +
-        'provaIniciaSimulacio. Ha de ser també a ALLOWED_SENDERS (Propietats de l\'script).'
-    },
-    {
       clau: 'max_torns_per_defecte',
       valor: 6,
       descripcio: 'Nombre màxim de respostes de la IA per conversa (de 1 a 12) quan l\'escenari no ' +
         'n\'indica cap a la columna max_torns.'
+    },
+    {
+      clau: 'correus_per_dia',
+      valor: 100,
+      descripcio: 'Correus que la bústia pot enviar en 24 hores: 100 amb un compte de Gmail, 1500 amb un ' +
+        'compte de Google Workspace. En arribar-hi, les activacions no s\'envien i les respostes esperen.'
     }
   ];
 
+  /** Paràmetres de versions anteriors: ara són a cada fila d'Activacions. */
+  var PARAMETRES_OBSOLETS = ['participant', 'escenari'];
+
   var llibreEnMemoria_ = null;
+
+  /** Full al qual està vinculat el projecte, o null si és independent. */
+  function llibreVinculat_() {
+    try {
+      return SpreadsheetApp.getActiveSpreadsheet() || null;
+    } catch (e) {
+      return null;
+    }
+  }
 
   function llibre_() {
     if (llibreEnMemoria_) return llibreEnMemoria_;
     var id = Config.llegeix().spreadsheetId;
-    if (!id) throw new Error('Falta la propietat SPREADSHEET_ID a Script Properties.');
-    llibreEnMemoria_ = SpreadsheetApp.openById(id);
+    if (id) {
+      llibreEnMemoria_ = SpreadsheetApp.openById(id);
+    } else {
+      llibreEnMemoria_ = llibreVinculat_();
+      if (!llibreEnMemoria_) {
+        throw new Error('No se sap quin full de càlcul fer servir. Instal·leu el programa des del full ' +
+          '(Extensions › Apps Script) o afegiu la propietat SPREADSHEET_ID a les Propietats de l\'script.');
+      }
+    }
     return llibreEnMemoria_;
+  }
+
+  /**
+   * D'on surt el full: { vinculat, idVinculat, nomVinculat, idPropietat }.
+   * Per a comprovaConfiguracio().
+   */
+  function origen() {
+    var vinculat = llibreVinculat_();
+    return {
+      vinculat: !!vinculat,
+      idVinculat: vinculat ? vinculat.getId() : '',
+      nomVinculat: vinculat ? vinculat.getName() : '',
+      idPropietat: Config.llegeix().spreadsheetId
+    };
   }
 
   function full_(nom) {
     var full = llibre_().getSheetByName(nom);
     if (!full) {
-      throw new Error('No existeix la pestanya "' + nom + '". Executa preparaFulls().');
+      throw new Error('No existeix la pestanya "' + nom + '". Feu Rèplica › Configuració › Prepara el full (o executeu preparaFulls).');
     }
     return full;
   }
@@ -1675,10 +2400,12 @@ var Repositori = (function () {
   function preparaFulls(escenariInicial) {
     var llibre = llibre_();
     var canvis = [];
+    var creades = {};
     Object.keys(COLUMNES).forEach(function (nom) {
       var full = llibre.getSheetByName(nom);
       if (!full) {
         full = llibre.insertSheet(nom);
+        creades[nom] = true;
         canvis.push('Pestanya creada: ' + nom);
       }
       if (FULLS_TEXT.indexOf(nom) !== -1) {
@@ -1699,6 +2426,8 @@ var Repositori = (function () {
       canvis.push('Escenari afegit: ' + escenariInicial.id);
     }
     preparaParametres_(llibre, canvis);
+    if (creades[FULLS.PARTICIPANTS]) migraRemitents_(canvis);
+    preparaValidacions_(llibre);
     eliminaFullsBuitsPerDefecte_(llibre).forEach(function (nom) {
       canvis.push('Pestanya buida eliminada: ' + nom);
     });
@@ -1707,29 +2436,73 @@ var Repositori = (function () {
   }
 
   /**
+   * Primera vegada que es crea la pestanya Participants: hi copia les
+   * adreces de la propietat obsoleta ALLOWED_SENDERS, marcades com a actives.
+   */
+  function migraRemitents_(canvis) {
+    var adreces = Config.analitzaRemitents(Config.propietat(Config.PROPIETATS.REMITENTS));
+    adreces.forEach(function (correu) {
+      afegeix_(FULLS.PARTICIPANTS, { correu: correu, actiu: true, notes: '' });
+    });
+    if (adreces.length) {
+      canvis.push('Participants copiats d\'ALLOWED_SENDERS: ' + adreces.length + ' (ja podeu esborrar la propietat)');
+    }
+  }
+
+  /** Casella de selecció a Participants › actiu i desplegable a Activacions › escenari. */
+  function preparaValidacions_(llibre) {
+    var participants = llibre.getSheetByName(FULLS.PARTICIPANTS);
+    var columnaActiu = capcalera_(participants).indexOf('actiu') + 1;
+    participants.getRange(2, columnaActiu, participants.getMaxRows() - 1, 1)
+      .setDataValidation(SpreadsheetApp.newDataValidation().requireCheckbox().build());
+
+    var activacions = llibre.getSheetByName(FULLS.ACTIVACIONS);
+    var cap = capcalera_(activacions);
+    activacions.getRange(2, cap.indexOf('escenari') + 1, activacions.getMaxRows() - 1, 1)
+      .setDataValidation(SpreadsheetApp.newDataValidation()
+        .requireValueInRange(llibre.getSheetByName(FULLS.ESCENARIS).getRange('A2:A'), true)
+        .setAllowInvalid(false).setHelpText('Trieu un id de la pestanya Escenaris.').build());
+  }
+
+  /**
    * Afegeix els paràmetres que falten a Configuració (sense canviar els
-   * valors existents) i hi aplica les llistes desplegables.
+   * valors existents), elimina els obsolets, actualitza les descripcions i
+   * hi aplica les llistes desplegables.
    */
   function preparaParametres_(llibre, canvis) {
+    var full = llibre.getSheetByName(FULLS.CONFIGURACIO);
+    llegeixTaula_(FULLS.CONFIGURACIO).files.slice().reverse().forEach(function (f) {
+      var clau = String(f.dades.clau).trim();
+      if (PARAMETRES_OBSOLETS.indexOf(clau) === -1) return;
+      full.deleteRow(f.fila);
+      canvis.push('Paràmetre eliminat de Configuració: ' + clau + ' (ara és a cada fila de la pestanya Activacions)');
+    });
+
     var existents = {};
     llegeixTaula_(FULLS.CONFIGURACIO).files.forEach(function (f) {
       existents[String(f.dades.clau).trim()] = true;
     });
-    // Migració: les propietats antigues PROVA_* passen a la pestanya.
-    var antigues = {
-      participant: Config.propietat(Config.PROPIETATS.PROVA_PARTICIPANT),
-      escenari: Config.propietat(Config.PROPIETATS.PROVA_ESCENARI)
-    };
     PARAMETRES.forEach(function (p) {
       if (existents[p.clau]) return;
-      var valor = antigues[p.clau] || p.valor;
-      afegeix_(FULLS.CONFIGURACIO, { clau: p.clau, valor: valor, descripcio: p.descripcio });
-      canvis.push('Paràmetre afegit a Configuració: ' + p.clau +
-        (antigues[p.clau] ? ' (copiat de la propietat ' + (p.clau === 'participant' ? 'PROVA_PARTICIPANT' : 'PROVA_ESCENARI') + ')' : ''));
+      afegeix_(FULLS.CONFIGURACIO, { clau: p.clau, valor: p.valor, descripcio: p.descripcio });
+      canvis.push('Paràmetre afegit a Configuració: ' + p.clau);
     });
 
-    var full = llibre.getSheetByName(FULLS.CONFIGURACIO);
-    var escenaris = llibre.getSheetByName(FULLS.ESCENARIS);
+    // Les descripcions són del programa: s'actualitzen amb cada versió.
+    var descripcions = {};
+    PARAMETRES.forEach(function (p) { descripcions[p.clau] = p.descripcio; });
+    var actualitzades = 0;
+    llegeixTaula_(FULLS.CONFIGURACIO).files.forEach(function (f) {
+      var clau = String(f.dades.clau).trim();
+      if (descripcions[clau] && f.dades.descripcio !== descripcions[clau]) {
+        actualitza_(FULLS.CONFIGURACIO, 'clau', clau, { descripcio: descripcions[clau] });
+        actualitzades++;
+      }
+    });
+    if (actualitzades > 0) {
+      canvis.push('Descripcions actualitzades a Configuració: ' + actualitzades);
+    }
+
     llegeixTaula_(FULLS.CONFIGURACIO).files.forEach(function (f) {
       var cella = full.getRange(f.fila, 2);
       var clau = String(f.dades.clau).trim();
@@ -1738,17 +2511,135 @@ var Repositori = (function () {
         regla = SpreadsheetApp.newDataValidation()
           .requireValueInList(Config.LIMITS.INTERVALS_PERMESOS.map(String), true)
           .setAllowInvalid(false).setHelpText('Trieu 1, 5, 10, 15 o 30 minuts.').build();
-      } else if (clau === 'escenari') {
+      } else if (clau === 'correus_per_dia') {
         regla = SpreadsheetApp.newDataValidation()
-          .requireValueInRange(escenaris.getRange('A2:A'), true)
-          .setAllowInvalid(false).setHelpText('Trieu un id de la pestanya Escenaris.').build();
+          .requireValueInList(Config.LIMITS.CORREUS_PER_DIA_PERMESOS.map(String), true)
+          .setAllowInvalid(false).setHelpText('100 amb un compte de Gmail; 1500 amb Google Workspace.').build();
       } else if (clau === 'max_torns_per_defecte') {
+        var opcions = [];
+        for (var n = 1; n <= Config.LIMITS.MAX_TORNS_ABSOLUT; n++) opcions.push(String(n));
         regla = SpreadsheetApp.newDataValidation()
-          .requireNumberBetween(1, Config.LIMITS.MAX_TORNS_ABSOLUT)
-          .setAllowInvalid(false).setHelpText('Un nombre entre 1 i ' + Config.LIMITS.MAX_TORNS_ABSOLUT + '.').build();
+          .requireValueInList(opcions, true)
+          .setAllowInvalid(false).setHelpText('Trieu un nombre entre 1 i ' + Config.LIMITS.MAX_TORNS_ABSOLUT + '.').build();
       }
       if (regla) cella.setDataValidation(regla);
     });
+  }
+
+  function esCert_(valor) {
+    return valor === true || String(valor).trim().toUpperCase() === 'TRUE';
+  }
+
+  /** Files de Participants: { fila, correu, actiu }. Sense la pestanya, cap. */
+  function participants() {
+    if (!llibre_().getSheetByName(FULLS.PARTICIPANTS)) return [];
+    return llegeixTaula_(FULLS.PARTICIPANTS).files.map(function (f) {
+      return { fila: f.fila, correu: Config.normalitzaCorreu(f.dades.correu), actiu: esCert_(f.dades.actiu) };
+    }).filter(function (p) { return p.correu !== ''; });
+  }
+
+  /** Adreces vàlides marcades com a actives: les úniques que reben simulacions i respostes. */
+  function participantsActius() {
+    return participants().filter(function (p) { return p.actiu && Config.esCorreuValid(p.correu); })
+      .map(function (p) { return p.correu; });
+  }
+
+  function esParticipantActiu(correu) {
+    return participantsActius().indexOf(Config.normalitzaCorreu(correu)) !== -1;
+  }
+
+  function normalitzaActivacio_(f) {
+    var d = f.dades;
+    return {
+      fila: f.fila,
+      id_activacio: String(d.id_activacio || '').trim(),
+      escenari: String(d.escenari || '').trim(),
+      destinataris: Config.analitzaRemitents(d.destinataris),
+      estat: String(d.estat || '').trim(),
+      resultat: String(d.resultat || '')
+    };
+  }
+
+  /** Files d'Activacions en ordre. */
+  function activacions() {
+    return llegeixTaula_(FULLS.ACTIVACIONS).files.map(normalitzaActivacio_);
+  }
+
+  /** Identificador per a una activació nova: ACT-001, ACT-002... */
+  function seguentIdActivacio() {
+    var maxim = 0;
+    activacions().forEach(function (a) {
+      var m = /^ACT-(\d+)$/.exec(a.id_activacio);
+      if (m) maxim = Math.max(maxim, Number(m[1]));
+    });
+    return 'ACT-' + ('00' + (maxim + 1)).slice(-Math.max(3, String(maxim + 1).length));
+  }
+
+  function actualitzaActivacio(fila, canvis) {
+    actualitzaFila_(FULLS.ACTIVACIONS, fila, canvis);
+  }
+
+  /**
+   * Fila seleccionada d'una de les pestanyes acceptades. Retorna { numero }
+   * o { error } amb el text que explica què cal fer (`com`).
+   */
+  function filaSeleccionada_(full, rang, pestanyes, com) {
+    if (!full || !rang) return { error: 'No hi ha cap cel·la seleccionada.\n\n' + com };
+    var nom = full.getName();
+    if (pestanyes.indexOf(nom) === -1) {
+      return { error: 'La cel·la seleccionada és a la pestanya «' + nom + '».\n\n' + com };
+    }
+    if (rang.getNumRows() !== 1) {
+      return { error: 'Heu seleccionat ' + rang.getNumRows() + ' files. Seleccioneu-ne només una.\n\n' + com };
+    }
+    var numero = rang.getRow();
+    if (numero < 2) return { error: 'Heu seleccionat la capçalera.\n\n' + com };
+    return { numero: numero };
+  }
+
+  /**
+   * Conversa de la fila seleccionada. Accepta una fila de Converses o de
+   * Missatges (columna id_conversa). Retorna { conversa } o { error }.
+   */
+  function conversaDeLaSeleccio(full, rang) {
+    var COM = 'Aneu a la pestanya Converses i feu clic a qualsevol cel·la de la fila de la conversa ' +
+      '(no a la capçalera). Després torneu a triar l\'opció del menú.';
+    var sel = filaSeleccionada_(full, rang, [FULLS.CONVERSES, FULLS.MISSATGES], COM);
+    if (sel.error) return sel;
+    var nom = full.getName();
+    var columna = capcalera_(full).indexOf('id_conversa');
+    if (columna === -1) return { error: 'La pestanya ' + nom + ' no té la columna id_conversa.' };
+    var id = String(full.getRange(sel.numero, columna + 1).getValues()[0][0] || '').trim();
+    if (!id) return { error: 'La fila ' + sel.numero + ' és buida.\n\n' + COM };
+    var c = conversa(id);
+    if (!c) return { error: 'No es troba la conversa ' + id + ' a la pestanya Converses.' };
+    return { conversa: c };
+  }
+
+  /** Activació de la fila seleccionada. Retorna { activacio } o { error }. */
+  function activacioDeLaSeleccio(full, rang) {
+    var COM = 'Aneu a la pestanya Activacions i feu clic a qualsevol cel·la de la fila de l\'activació ' +
+      '(no a la capçalera). Després torneu a triar l\'opció del menú.';
+    var sel = filaSeleccionada_(full, rang, [FULLS.ACTIVACIONS], COM);
+    if (sel.error) return sel;
+    var trobada = null;
+    activacions().forEach(function (a) { if (a.fila === sel.numero) trobada = a; });
+    if (!trobada) return { error: 'La fila ' + sel.numero + ' és buida.\n\n' + COM };
+    return { activacio: trobada };
+  }
+
+  /**
+   * Correus de la clienta (inicials i respostes) registrats des de
+   * `desDeIso`, enviats o en curs d'enviament. Serveix per no passar del
+   * límit diari de Gmail.
+   */
+  function correusEnviatsDesDe(desDeIso) {
+    return llegeixTaula_(FULLS.MISSATGES).files.filter(function (f) {
+      var d = f.dades;
+      return String(d.rol) === ROLS.INTERLOCUTOR &&
+        (String(d.estat_enviament) === ESTATS_MISSATGE.ENVIAT || String(d.estat_enviament) === ESTATS_MISSATGE.PENDENT) &&
+        String(d.data || '') >= desDeIso;
+    }).length;
   }
 
   /**
@@ -1761,7 +2652,7 @@ var Repositori = (function () {
     var crus = {};
     var llibre = llibre_();
     if (!llibre.getSheetByName(FULLS.CONFIGURACIO)) {
-      errors.push({ clau: 'Configuració', missatge: 'la pestanya no existeix: executa preparaFulls()' });
+      errors.push({ clau: 'Configuració', missatge: 'la pestanya no existeix: feu Rèplica › Configuració › Prepara el full (o executeu preparaFulls)' });
     } else {
       llegeixTaula_(FULLS.CONFIGURACIO).files.forEach(function (f) {
         crus[String(f.dades.clau).trim()] = f.dades.valor;
@@ -1777,6 +2668,14 @@ var Repositori = (function () {
       interval = Config.LIMITS.INTERVAL_DISPARADOR_MINUTS;
     }
 
+    var correusPerDia = Number(text('correus_per_dia'));
+    if (text('correus_per_dia') === '') {
+      correusPerDia = Config.LIMITS.CORREUS_PER_DIA_PER_DEFECTE;
+    } else if (Config.LIMITS.CORREUS_PER_DIA_PERMESOS.indexOf(correusPerDia) === -1) {
+      errors.push({ clau: 'correus_per_dia', missatge: '"' + text('correus_per_dia') + '" no és vàlid; ha de ser 100 o 1500' });
+      correusPerDia = Config.LIMITS.CORREUS_PER_DIA_PER_DEFECTE;
+    }
+
     var maxTorns = Number(text('max_torns_per_defecte'));
     if (text('max_torns_per_defecte') === '') {
       maxTorns = Config.LIMITS.MAX_TORNS_PER_DEFECTE;
@@ -1788,9 +2687,8 @@ var Repositori = (function () {
     return {
       valors: {
         intervalMinuts: interval,
-        escenari: text('escenari') || 'ESC-001',
-        participants: Config.analitzaRemitents(text('participant')),
-        maxTornsPerDefecte: maxTorns
+        maxTornsPerDefecte: maxTorns,
+        correusPerDia: correusPerDia
       },
       errors: errors
     };
@@ -1863,6 +2761,19 @@ var Repositori = (function () {
       if (String(f.dades[columnaId]) === String(id)) trobada = f;
     });
     if (!trobada) throw new Error('No s\'ha trobat ' + columnaId + '=' + id + ' a ' + nom + '.');
+    escriuFila_(taula, trobada, canvis);
+  }
+
+  /** Canvia columnes d'una fila concreta (pel número de fila). */
+  function actualitzaFila_(nom, numero, canvis) {
+    var taula = llegeixTaula_(nom);
+    var trobada = null;
+    taula.files.forEach(function (f) { if (f.fila === numero) trobada = f; });
+    if (!trobada) throw new Error('La fila ' + numero + ' de ' + nom + ' és buida.');
+    escriuFila_(taula, trobada, canvis);
+  }
+
+  function escriuFila_(taula, trobada, canvis) {
     var fila = taula.capcalera.map(function (c) {
       var v = Object.prototype.hasOwnProperty.call(canvis, c) ? canvis[c] : trobada.dades[c];
       return valorSegur_(v === undefined || v === null ? '' : v);
@@ -1901,7 +2812,8 @@ var Repositori = (function () {
       torns_ia: Number(d.torns_ia) || 0,
       data_inici: String(d.data_inici || ''),
       data_actualitzacio: String(d.data_actualitzacio || ''),
-      darrer_error: String(d.darrer_error || '')
+      darrer_error: String(d.darrer_error || ''),
+      id_activacio: String(d.id_activacio || '')
     };
   }
 
@@ -1984,9 +2896,21 @@ var Repositori = (function () {
     COLUMNES: COLUMNES,
     ESTATS_CONVERSA: ESTATS_CONVERSA,
     ESTATS_MISSATGE: ESTATS_MISSATGE,
+    ESTATS_ACTIVACIO: ESTATS_ACTIVACIO,
     ROLS: ROLS,
+    llibre: llibre_,
+    origen: origen,
     preparaFulls: preparaFulls,
     configuracio: configuracio,
+    participants: participants,
+    participantsActius: participantsActius,
+    esParticipantActiu: esParticipantActiu,
+    activacions: activacions,
+    seguentIdActivacio: seguentIdActivacio,
+    actualitzaActivacio: actualitzaActivacio,
+    conversaDeLaSeleccio: conversaDeLaSeleccio,
+    activacioDeLaSeleccio: activacioDeLaSeleccio,
+    correusEnviatsDesDe: correusEnviatsDesDe,
     estableixConfiguracio: estableixConfiguracio,
     escenari: escenari,
     converses: converses,

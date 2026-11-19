@@ -35,3 +35,13 @@ test('Codi incomplet: preparaFulls s\'atura amb un missatge llegible', () => {
   const e = creaEntorn({ ometFitxers: ['Logger.js'] });
   assert.throws(() => e.g.preparaFulls(), /Codi incomplet a l'editor:\n- falta Registre/);
 });
+
+test('dist/Replica.gs inclou el menú: vinculat al full, sense SPREADSHEET_ID', () => {
+  const e = creaEntorn({ codi: fs.readFileSync(SORTIDA, 'utf8'), vinculat: true, propietats: { SPREADSHEET_ID: '' } });
+  e.g.onOpen();
+  assert.equal(e.ui.menu.titol, 'Rèplica');
+  e.g.menuPreparaFull();
+  assert.match(e.ui.darrer().text, /^Fet\. Canvis:/);
+  e.g.menuComprovaConfiguracio();
+  assert.match(e.ui.darrer().text, /\[OK\] Codi: tots els mòduls carregats/);
+});
