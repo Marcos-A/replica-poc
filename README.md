@@ -119,11 +119,13 @@ La configuració es desa a les **Propietats de l'script** (un espai privat del p
 | `GEMINI_API_KEY` | La clau del pas 3.5 | `AIza…` |
 | `GEMINI_MODEL` | L'identificador del model triat | el que heu copiat a AI Studio |
 | `SPREADSHEET_ID` | L'identificador del full (pas 3.2) | `1AbCdEf…xyz` |
-| `ALLOWED_SENDERS` | Adreces dels docents participants, separades per comes | `docent1@example.org, docent2@example.org` |
+| `ALLOWED_SENDERS` | **Totes** les adreces dels docents que poden participar, separades per comes | `docent1@example.org, docent2@example.org` |
 | `SIMULATION_ENABLED` | `false` (de moment) | `false` |
-| `PROVA_PARTICIPANT` | *(opcional)* **Una sola** adreça: la del docent amb qui iniciareu la simulació | `docent1@example.org` |
+| `PROVA_PARTICIPANT` | *(opcional)* **Una sola adreça**, sense comes: la del docent amb qui iniciareu la propera simulació. Ha de ser també a `ALLOWED_SENDERS`. | `docent1@example.org` |
 
 3. Feu clic a **Desa les propietats de l'script**.
+
+> ❗ **No confongueu `ALLOWED_SENDERS` i `PROVA_PARTICIPANT`.** `ALLOWED_SENDERS` és la llista de **tots** els participants possibles. `PROVA_PARTICIPANT` és **només una** persona: la que rebrà el correu quan executeu `provaIniciaSimulacio`. Per iniciar una simulació amb una altra persona, canvieu `PROVA_PARTICIPANT` per la seva adreça i torneu a executar `provaIniciaSimulacio`.
 
 > ❗ A `ALLOWED_SENDERS` **no** hi poseu l'adreça de la bústia de prova: el programa ignoraria els correus o podria crear un bucle.
 
