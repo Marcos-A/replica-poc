@@ -26,19 +26,29 @@ Aquesta versió és una **prova de concepte** del departament d'Administració i
 
 ## 1. Com funciona
 
-```text
- Coordinador/a                                  Participants
-      │ 1. envia una activació                   (cadascun al seu correu)
-      │    (menú Rèplica del full)                      ▲  │
-      ▼                                                 │  │ 3. responen
- ┌───────────────────────────┐ 2. un correu de la clienta │  │
- │ Google Apps Script        │    a cada participant,     │  │
- │ (bústia de prova de Gmail)│────en un fil separat───────┘  │
- │                           │◄──────────────────────────────┘
- │                           │  4. cada pocs minuts revisa si hi ha respostes
- │                           │──► Gemini escriu la resposta de la clienta
- │                           │──► Google Sheets desa les converses
- └───────────────────────────┘  5. respon dins del fil de cada participant
+El diagrama es llegeix de dalt a baix, pels números. Els passos del requadre es repeteixen a cada resposta del participant.
+
+```mermaid
+%%{init: {"sequence": {"mirrorActors": false}}}%%
+sequenceDiagram
+    autonumber
+    actor C as Coordinador/a
+    participant F as Full de càlcul<br/>(menú Rèplica)
+    participant R as Rèplica<br/>(Apps Script i bústia de Gmail)
+    participant G as Gemini
+    actor P as Participant
+
+    C->>F: Omple una activació i tria «Envia»
+    F->>R: Escenari i destinataris
+    R->>P: Correu inicial de la clienta<br/>(un fil separat per a cada persona)
+    loop Fins al comiat o al màxim de respostes
+        P->>R: Respon des del seu correu habitual
+        Note over R: Cada pocs minuts revisa la bústia
+        R->>G: La conversa, sense adreces de correu
+        G-->>R: La resposta de la clienta
+        R->>P: Respon dins del mateix fil
+        R->>F: Desa la conversa
+    end
 ```
 
 - Tot funciona dins de Google: **Google Sheets** (el full de càlcul, des d'on es fa servir tot amb el menú **Rèplica**), **Apps Script** (el programa, instal·lat dins del full) i **Gmail** (la bústia que envia els correus de la clienta).
