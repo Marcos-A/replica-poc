@@ -61,7 +61,9 @@ Feu **tots** aquests passos havent iniciat sessió amb el **compte de Google de 
 
 1. Obriu <https://github.com/Marcos-A/replica-poc>.
 2. Feu clic al botó verd **Code** → **Download ZIP**.
-3. Descomprimiu el fitxer. Hi trobareu una carpeta `src` amb els fitxers del programa.
+3. Descomprimiu el fitxer. Només en necessitareu dos: **`dist/Replica.gs`** (tot el programa en un sol fitxer) i **`src/appsscript.json`** (els permisos).
+
+> 💡 Per obrir-los i copiar-ne el contingut, feu servir un editor de text senzill (Bloc de notes, TextEdit…), no un processador de textos com Word.
 
 ### 3.2. Crear el full de càlcul
 
@@ -82,19 +84,16 @@ No cal crear les pestanyes: el programa les crearà sol i eliminarà la pestanya
    - A **Zona horària**, trieu `(GMT+01:00) Madrid` si no hi és.
 4. Torneu a l'editor (icona `< >` a l'esquerra).
 
-### 3.4. Copiar els fitxers del programa
+### 3.4. Copiar el programa
 
 A l'editor veureu un fitxer anomenat `Codi.gs` (o `Code.gs`) i `appsscript.json`.
 
-1. **`appsscript.json`**: obriu-lo, esborreu-ne tot el contingut i enganxeu-hi el contingut del fitxer `src/appsscript.json` que heu descarregat. Deseu (icona del disquet o `Ctrl+S`).
-2. **`Codi.gs`**: feu clic als tres punts del costat del nom → **Suprimeix**.
-3. Per a **cada fitxer `.js`** de la carpeta `src`, feu:
-   1. Botó **+** (al costat de «Fitxers») → **Script**.
-   2. Escriviu el nom **sense extensió** (per exemple `Main`; l'editor hi afegeix `.gs`).
-   3. Esborreu el contingut d'exemple i enganxeu-hi el contingut del fitxer.
-   4. Deseu.
+1. **`appsscript.json`**: obriu-lo, esborreu-ne tot el contingut i enganxeu-hi el contingut de `src/appsscript.json`. Deseu (icona del disquet o `Ctrl+S`).
+2. **`Codi.gs`**: feu clic als tres punts del costat del nom → **Canvia el nom** → escriviu `Replica` (l'editor hi afegeix `.gs`).
+3. Obriu **`Replica.gs`**, esborreu-ne tot el contingut (`Ctrl+A` i `Supr`) i enganxeu-hi **sencer** el contingut de `dist/Replica.gs`. És un fitxer llarg: comproveu que comença per `/**` i `Rèplica · prova de concepte` i que acaba per `})();`.
+4. Deseu.
 
-   Els fitxers són 10: `AiProvider`, `Config`, `ConversationService`, `EscenariInicial`, `GeminiProvider`, `GmailGateway`, `Logger`, `Main`, `PromptBuilder` i `SheetsRepository`. L'ordre no importa.
+Al final, a la llista de fitxers de l'editor hi ha d'haver **només** `appsscript.json` i `Replica.gs`.
 
 > 💡 Si sabeu fer servir la terminal, podeu pujar els fitxers automàticament amb `clasp` en lloc de copiar-los a mà: vegeu [docs/instal·lacio.md](docs/instal·lacio.md#camí-b-pujar-el-codi-amb-clasp).
 
@@ -106,6 +105,18 @@ A l'editor veureu un fitxer anomenat `Codi.gs` (o `Code.gs`) i `appsscript.json`
 4. Trieu un **model**. A AI Studio, al selector de models, copieu-ne l'identificador exacte (per exemple, un model de la família *Flash*, que és ràpid i econòmic). Comproveu a la pàgina de **preus i límits** que aquest model tingui quota gratuïta o que el projecte tingui facturació activada: no tots els models en tenen.
 
 > ℹ️ Amb el nivell gratuït, Google pot fer servir el contingut de les peticions per millorar els seus productes. Per això només s'han de fer servir **dades inventades**.
+
+### 3.6. Actualitzar a una versió nova
+
+Quan hi hagi una versió nova del programa:
+
+1. Descarregueu el ZIP de nou (pas 3.1).
+2. A l'editor, obriu `Replica.gs`, seleccioneu-ho tot (`Ctrl+A`) i enganxeu-hi el nou `dist/Replica.gs`. Deseu.
+3. Executeu `preparaFulls` i `comprovaConfiguracio`.
+
+Les propietats, el full de càlcul, la pestanya Configuració i el disparador es conserven: no cal tornar-los a configurar.
+
+> ❗ **Si teníeu la instal·lació antiga amb 10 fitxers separats** (`AiProvider.gs`, `Config.gs`, `Main.gs`…), suprimiu-los **tots** (tres punts → **Suprimeix**) i deixeu només `appsscript.json` i `Replica.gs`. Si en queda algun d'antic, el programa podria barrejar versions.
 
 ## 4. Configuració
 
@@ -206,7 +217,7 @@ Instruccions detallades: [docs/operacio.md](docs/operacio.md).
 | `… ha de contenir una sola adreça` | A `participant` hi ha diverses adreces | Deixeu-n'hi només una; la llista completa va a `ALLOWED_SENDERS` |
 | `L'adreça … no és a ALLOWED_SENDERS` | El participant no és a la llista | Afegiu-lo a la propietat `ALLOWED_SENDERS` |
 | `Ja hi ha una conversa oberta` | Aquest docent ja té una simulació en curs | Acabeu-la o tanqueu-la amb `tancaConversa` |
-| `… is not defined` (per exemple, `Bustia is not defined`) | Un fitxer de l'editor no té el codi que li correspon | Torneu a enganxar-hi el fitxer de `src/` del mateix nom (pas 3.4) |
+| `Codi incomplet a l'editor`, `[ERROR] Codi: falta …` o `… is not defined` | El codi enganxat a l'editor no és complet | Torneu a enganxar `dist/Replica.gs` sencer a `Replica.gs` (pas 3.4) i comproveu que no hi queden fitxers antics |
 | El participant respon però no arriba res | Encara no ha passat l'interval de revisió, o l'interruptor és apagat | Espereu o executeu `processaCorreusPendents`; mireu el full (columna `darrer_error`) i el menú **Execucions** d'Apps Script |
 | `darrer_error` diu `HTTP 429` | S'ha exhaurit la quota de Gemini | El programa ho tornarà a provar sol; si persisteix, reviseu la quota a AI Studio |
 | `darrer_error` diu `HTTP 400` o `403` | La clau o el model no són correctes | Reviseu `GEMINI_API_KEY` i `GEMINI_MODEL`, executeu `comprovaConfiguracio` i després `reactivaConversa` |
@@ -228,7 +239,7 @@ Instruccions detallades: [docs/operacio.md](docs/operacio.md).
 replica-poc/
 ├── src/                     Codi d'Apps Script (rootDir de clasp)
 │   ├── appsscript.json      Manifest: zona horària, V8 i permisos OAuth
-│   ├── Main.js              Funcions públiques (desplegable «Executa»)
+│   ├── Main.js              Funcions públiques (desplegable «Executa») i disparador
 │   ├── Config.js            Script Properties i límits
 │   ├── SheetsRepository.js  Accés a Sheets (Configuració, Escenaris, Converses, Missatges)
 │   ├── GmailGateway.js      Accés a Gmail, neteja de text i filtres
@@ -238,8 +249,10 @@ replica-poc/
 │   ├── GeminiProvider.js    Adaptador de Gemini (Interactions API)
 │   ├── EscenariInicial.js   Escenari ESC-001
 │   └── Logger.js            Registres amb dades sensibles emmascarades
+├── dist/Replica.gs          FITXER GENERAT: tot src/*.js en un sol fitxer (npm run build)
 ├── test/                    Proves amb dobles de Gmail, Sheets i Gemini
 ├── exemples/escenari-001.json
+├── scripts/build.js         Genera dist/Replica.gs
 ├── scripts/clasp.sh         clasp dins de Docker
 └── docs/                    Instal·lació, operació i proves
 ```
@@ -247,9 +260,13 @@ replica-poc/
 Ordres (amb Node.js 22 o amb Docker, sense instal·lar res):
 
 ```sh
-# Proves automàtiques (no envien correus ni criden Gemini)
+# Després de canviar qualsevol fitxer de src/, regenereu el fitxer únic
+npm run build
+
+# Proves automàtiques (no envien correus ni criden Gemini).
+# Fallen si dist/Replica.gs no està al dia amb src/.
 npm test
-docker run --rm -v "$PWD":/app:ro -w /app node:22-alpine npm test
+docker run --rm -u "$(id -u):$(id -g)" -v "$PWD":/app -w /app node:22-alpine sh -c "npm run build && npm test"
 
 # Pujar el codi a Apps Script amb clasp 3.4.1
 ./scripts/clasp.sh login --no-localhost
@@ -264,7 +281,7 @@ Documentació tècnica:
 
 ## 10. Estat del projecte i limitacions
 
-- ✅ Codi complet i **46 proves automàtiques** superades amb dobles de prova.
+- ✅ Codi complet i **50 proves automàtiques** superades amb dobles de prova.
 - ✅ **Verificat en real (19/11/2026)**: enviament del correu inicial, recepció, resposta del participant, generació amb Gemini i resposta automàtica dins del mateix fil.
 - ⏳ **Pendents de verificar en real**: execució doble, missatges consecutius, intents de revelar dades reservades, tancament de la conversa i límit de torns. Vegeu [docs/proves.md](docs/proves.md).
 - Les respostes poden trigar diversos minuts (revisió periòdica, no instantània).

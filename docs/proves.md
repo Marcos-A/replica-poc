@@ -8,9 +8,9 @@ Hi ha dos tipus de proves:
 ## Com executar les proves automàtiques
 
 ```sh
-npm test
+npm run build && npm test
 # o, sense instal·lar Node.js:
-docker run --rm --network none -v "$PWD":/app:ro -w /app node:22-alpine npm test
+docker run --rm --network none -u "$(id -u):$(id -g)" -v "$PWD":/app -w /app node:22-alpine sh -c "npm run build && npm test"
 ```
 
 ## Proves d'acceptació (especificacions, secció 12)
@@ -33,11 +33,11 @@ Llegenda: ✅ superada · ⏳ pendent · — no aplicable
 | Interruptor global desactivat | Cap processament ni enviament | ✅ | ⏳ |
 | Dades reservades | No apareixen al correu inicial ni es revelen per petició directa | ✅ (correu inicial i prompt) | ⏳ (resposta real de Gemini) |
 
-Proves automàtiques addicionals: pestanya Configuració (creació idempotent sense sobreescriure valors, desplegables, migració de PROVA_PARTICIPANT/PROVA_ESCENARI, valors incorrectes amb error llegible i valor per defecte, participant amb diverses adreces o fora d'ALLOWED_SENDERS, max_torns per defecte), canvi d'interval aplicat automàticament al disparador, eliminació de la pestanya per defecte només si és buida, execució simultània amb el bloqueig ocupat, respostes automàtiques («fora de l'oficina») i notificacions de no lliurament, sortida buida o no JSON de Gemini, enviament interromput (abans i després d'enviar) i reconciliació, enviament inicial interromput i reconciliació amb Enviats, coherència entre `exemples/escenari-001.json` i l'escenari carregat, absència de la clau i d'adreces completes als registres, i funcions pures (neteja de cites i signatures, detecció d'automatismes, interpretació de la resposta de Gemini).
+Proves automàtiques addicionals: `dist/Replica.gs` al dia amb `src/` i funcional per si sol, detecció de codi incomplet a l'editor (quin mòdul i quin fitxer falten), pestanya Configuració (creació idempotent sense sobreescriure valors, desplegables, migració de PROVA_PARTICIPANT/PROVA_ESCENARI, valors incorrectes amb error llegible i valor per defecte, participant amb diverses adreces o fora d'ALLOWED_SENDERS, max_torns per defecte), canvi d'interval aplicat automàticament al disparador, eliminació de la pestanya per defecte només si és buida, execució simultània amb el bloqueig ocupat, respostes automàtiques («fora de l'oficina») i notificacions de no lliurament, sortida buida o no JSON de Gemini, enviament interromput (abans i després d'enviar) i reconciliació, enviament inicial interromput i reconciliació amb Enviats, coherència entre `exemples/escenari-001.json` i l'escenari carregat, absència de la clau i d'adreces completes als registres, i funcions pures (neteja de cites i signatures, detecció d'automatismes, interpretació de la resposta de Gemini).
 
 ### Resultat observat
 
-19/11/2026, Node.js 22.23.4 (contenidor `node:22-alpine`): **46 proves, 46 superades, 0 fallades.**
+19/11/2026, Node.js 22.23.4 (contenidor `node:22-alpine`): **50 proves, 50 superades, 0 fallades.**
 
 ## Prova manual d'integració (en curs)
 

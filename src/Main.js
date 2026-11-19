@@ -4,8 +4,41 @@
  * punts d'entrada i missatges per al docent coordinador.
  */
 
+/**
+ * Mòduls que han d'existir i fitxer de src/ que els defineix. Si se n'ha
+ * enganxat un al fitxer equivocat de l'editor, aquí es detecta.
+ */
+var MODULS_ = [
+  ['ProveidorIA', 'AiProvider'],
+  ['Config', 'Config'],
+  ['Simulacio', 'ConversationService'],
+  ['ESCENARI_INICIAL', 'EscenariInicial'],
+  ['Gemini', 'GeminiProvider'],
+  ['Bustia', 'GmailGateway'],
+  ['Registre', 'Logger'],
+  ['Disparador', 'Main'],
+  ['Indicacions', 'PromptBuilder'],
+  ['Repositori', 'SheetsRepository']
+];
+
+/** Llista de mòduls que no s'han carregat. No depèn de cap altre mòdul. */
+function modulsQueFalten_() {
+  var global = typeof globalThis !== 'undefined' ? globalThis : this;
+  return MODULS_.filter(function (m) { return typeof global[m[0]] === 'undefined'; })
+    .map(function (m) {
+      return 'falta ' + m[0] + ': torneu a enganxar dist/Replica.gs sencer (o, si teniu els fitxers separats, ' +
+        'src/' + m[1] + '.js al fitxer ' + m[1] + '.gs)';
+    });
+}
+
+function exigeixModuls_() {
+  var falten = modulsQueFalten_();
+  if (falten.length) throw new Error('Codi incomplet a l\'editor:\n- ' + falten.join('\n- '));
+}
+
 /** Crea les pestanyes, capçaleres i l'escenari ESC-001 si falten. Idempotent. */
 function preparaFulls() {
+  exigeixModuls_();
   var canvis = Repositori.preparaFulls(ESCENARI_INICIAL);
   var missatge = canvis.length ? 'Canvis:\n- ' + canvis.join('\n- ') : 'Tot ja estava preparat; no s\'ha canviat res.';
   Registre.info(missatge);
@@ -22,10 +55,21 @@ function comprovaConfiguracio(ometGemini) {
     diagnostics.push({ element: element, estat: estat, detall: detall });
   }
 
-  var falten = Config.propietatsQueFalten();
+  // Primer, el codi: sense tots els mòduls, la resta de comprovacions fallaria.
+  var falten = modulsQueFalten_();
+  if (falten.length) {
+    falten.forEach(function (f) { afegeix('Codi', 'ERROR', f); });
+    var textCodi = diagnostics.map(function (d) { return '[' + d.estat + '] ' + d.element + ': ' + d.detall; }).join('\n');
+    console.error('Configuració incompleta\n' + textCodi);
+    return { correcte: false, diagnostics: diagnostics, text: textCodi };
+  }
+  afegeix('Codi', 'OK', 'tots els mòduls carregats');
+
+  var propietatsQueFalten = Config.propietatsQueFalten();
   Config.OBLIGATORIES.forEach(function (nom) {
-    afegeix('Propietat ' + nom, falten.indexOf(nom) === -1 ? 'OK' : 'ERROR',
-      falten.indexOf(nom) === -1 ? 'configurada' : 'falta: afegeix-la a Configuració del projecte > Propietats de l\'script');
+    var falta = propietatsQueFalten.indexOf(nom) !== -1;
+    afegeix('Propietat ' + nom, falta ? 'ERROR' : 'OK',
+      falta ? 'falta: afegeix-la a Configuració del projecte > Propietats de l\'script' : 'configurada');
   });
 
   var conf = Config.llegeix();

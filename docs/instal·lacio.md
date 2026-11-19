@@ -22,7 +22,15 @@ Els passos marcats **Persona** requereixen iniciar sessió o acceptar permisos: 
 
 ## Camí A: copiar el codi a l'editor
 
-Vegeu el [README, secció 3.4](../README.md#34-copiar-els-fitxers-del-programa). Els fitxers `src/*.js` s'enganxen com a fitxers d'script (`.gs`) amb el mateix nom. El codi no depèn de l'ordre de càrrega dels fitxers: cap mòdul fa referència a un altre fora d'una funció.
+Vegeu el [README, secció 3.4](../README.md#34-copiar-el-programa). S'enganxen dos fitxers: `src/appsscript.json` i **`dist/Replica.gs`**, que conté tot `src/*.js` concatenat per `npm run build`.
+
+- `src/` és l'única font del codi. `dist/Replica.gs` és un fitxer generat i es versiona perquè es pugui descarregar amb *Download ZIP*. No s'ha d'editar a mà.
+- `npm test` falla si `dist/Replica.gs` no coincideix amb `src/`. Executeu `npm run build` després de cada canvi a `src/`.
+- Cada mòdul comença amb un comentari `// ===== src/<fitxer>.js =====`. Per localitzar una línia d'un error de l'editor, cerqueu el marcador anterior.
+- `comprovaConfiguracio()` i `preparaFulls()` comproven primer que tots els mòduls estan carregats i diuen quin falta.
+- No barregeu `Replica.gs` amb els fitxers separats: totes les declaracions són globals i la darrera versió carregada sobreescriuria les altres sense cap error.
+
+Els usuaris de clasp (camí B) pugen `src/` tal com és (fitxers separats) i no fan servir `dist/`.
 
 ## Camí B: pujar el codi amb clasp
 

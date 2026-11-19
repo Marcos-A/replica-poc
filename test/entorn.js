@@ -263,7 +263,11 @@ function creaEntorn(opcions = {}) {
     Date, JSON, Math, Object, Array, String, Number, Error, RegExp
   };
   vm.createContext(context);
-  const codi = fs.readdirSync(DIR_SRC).filter((f) => f.endsWith('.js')).sort()
+  // opcions.codi: carrega un codi concret (p. ex. dist/Replica.gs).
+  // opcions.ometFitxers: simula fitxers de l'editor sense el codi que toca.
+  const omesos = opcions.ometFitxers || [];
+  const codi = opcions.codi || fs.readdirSync(DIR_SRC).filter((f) => f.endsWith('.js'))
+    .filter((f) => !omesos.includes(f)).sort()
     .map((f) => fs.readFileSync(path.join(DIR_SRC, f), 'utf8')).join('\n;\n');
   vm.runInContext(codi, context, { filename: 'src-concatenat.js' });
 
