@@ -27,6 +27,7 @@ var Menu = (function () {
       .addSeparator()
       .addItem('Atura la conversa seleccionada…', 'menuAturaConversa')
       .addItem('Reactiva la conversa seleccionada…', 'menuReactivaConversa')
+      .addItem('Reobre la conversa seleccionada…', 'menuReobreConversa')
       .addItem('Estat de les converses', 'menuEstatConverses')
       .addSeparator();
     if (activada === true) {
@@ -190,7 +191,8 @@ var Menu = (function () {
         return;
       }
       if (!confirma_(ui, TITOL, descriuConversa_(c) + '\n\nLa conversa passarà a FINALITZADA sense enviar cap ' +
-          'comiat. Si el participant hi torna a respondre, no rebrà resposta.\n\nVoleu aturar-la?')) return;
+          'comiat. Si el participant hi torna a respondre, no rebrà resposta (fins que la reobriu amb «Reobre la ' +
+          'conversa seleccionada»).\n\nVoleu aturar-la?')) return;
       tancaConversa(c.id_conversa);
       avisa_(ui, TITOL, 'Conversa ' + c.id_conversa + ' aturada (FINALITZADA).');
     });
@@ -214,6 +216,38 @@ var Menu = (function () {
       reactivaConversa(c.id_conversa);
       avisa_(ui, TITOL, 'Conversa ' + c.id_conversa + ' reactivada (ACTIVA). La clienta respondrà a la propera ' +
         'revisió automàtica, o ara mateix si feu Rèplica › Revisa ara les respostes.');
+    });
+  }
+
+  function reobreConversaSeleccionada() {
+    var TITOL = 'Reobre la conversa seleccionada';
+    executa(TITOL, function (ui) {
+      var c = conversaSeleccionada_(ui, TITOL);
+      if (!c) return;
+      if (c.estat !== Repositori.ESTATS_CONVERSA.FINALITZADA) {
+        avisa_(ui, TITOL, 'Només es poden reobrir les converses finalitzades. Aquesta és en estat ' + c.estat + '.' +
+          (c.estat === Repositori.ESTATS_CONVERSA.ERROR ? ' Per a les converses en ERROR, feu servir «Reactiva la conversa seleccionada».' : '') +
+          '\n\n' + descriuConversa_(c));
+        return;
+      }
+      var perDefecte = Config.LIMITS.RESPOSTES_EXTRA_PER_DEFECTE;
+      var maxim = Config.LIMITS.MAX_RESPOSTES_EXTRA;
+      var resposta = ui.prompt(TITOL, descriuConversa_(c) + '\n\nQuantes respostes més pot enviar la clienta en aquesta ' +
+        'conversa? Escriviu un nombre de 1 a ' + maxim + ', o deixeu-ho en blanc per a ' + perDefecte + '.\n\n' +
+        'Si el participant ha escrit mentre la conversa era tancada, la clienta li respondrà a la propera revisió.',
+        ui.ButtonSet.OK_CANCEL);
+      if (resposta.getSelectedButton() !== ui.Button.OK) return;
+      var text = String(resposta.getResponseText() || '').trim();
+      var extra = text === '' ? perDefecte : Number(text);
+      if (!(Math.floor(extra) === extra && extra >= 1 && extra <= maxim)) {
+        avisa_(ui, TITOL, '«' + text + '» no és vàlid: escriviu un nombre de 1 a ' + maxim + '. No s\'ha canviat res.');
+        return;
+      }
+      var r = reobreConversa(c.id_conversa, extra);
+      avisa_(ui, TITOL, 'Conversa ' + c.id_conversa + ' reoberta (ACTIVA). La clienta pot enviar ' + extra +
+        ' resposta(es) més (fins a ' + r.maxTorns + ' en total).\n\nSi el participant ja hi havia escrit, la clienta ' +
+        'respondrà a la propera revisió automàtica, o ara mateix si feu Rèplica › Revisa ara les respostes. Si no, ' +
+        'esperarà el seu proper correu.');
     });
   }
 
@@ -325,6 +359,7 @@ var Menu = (function () {
     revisaAra: revisaAra,
     aturaConversa: aturaConversa,
     reactivaConversa: reactivaConversaSeleccionada,
+    reobreConversa: reobreConversaSeleccionada,
     estatConverses: estatConverses,
     activa: activa,
     atura: atura,
@@ -351,6 +386,7 @@ function menuEnviaActivacio() { Menu.enviaActivacio(); }
 function menuRevisaAra() { Menu.revisaAra(); }
 function menuAturaConversa() { Menu.aturaConversa(); }
 function menuReactivaConversa() { Menu.reactivaConversa(); }
+function menuReobreConversa() { Menu.reobreConversa(); }
 function menuEstatConverses() { Menu.estatConverses(); }
 function menuActivaSimulacions() { Menu.activa(); }
 function menuAturaSimulacions() { Menu.atura(); }

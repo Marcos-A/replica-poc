@@ -516,6 +516,17 @@ function tancaConversa(idConversa) {
   return Simulacio.tanca(idConversa);
 }
 
+/**
+ * Torna a obrir una conversa FINALITZADA amb `respostesExtra` respostes més
+ * de la clienta (per defecte, 2).
+ */
+function reobreConversa(idConversa, respostesExtra) {
+  Compte.exigeix();
+  var extra = respostesExtra === undefined || respostesExtra === null || respostesExtra === ''
+    ? Config.LIMITS.RESPOSTES_EXTRA_PER_DEFECTE : respostesExtra;
+  return Simulacio.reobre(idConversa, extra);
+}
+
 /** Resum de l'estat de les converses (adreces emmascarades). */
 function estatSimulacions() {
   var converses = Repositori.converses();

@@ -63,7 +63,7 @@ El text que s'envia és la cel·la `missatge_inicial` de la pestanya **Escenaris
 | --- | --- | --- |
 | `ACTIVA` | Espera respostes del participant | Res |
 | `PROCESSANT` | S'està generant o enviant una resposta. Si hi queda més d'uns minuts, una execució es va interrompre | Res: la següent execució ho reconcilia sola |
-| `FINALITZADA` | Comiat enviat (situació resolta o límit de torns) o aturada a mà | Res. Les respostes posteriors del participant s'ignoren |
+| `FINALITZADA` | Comiat enviat (situació resolta o límit de torns) o aturada a mà | Res. Les respostes posteriors del participant no es responen fins que es reobri (vegeu [Reobrir una conversa finalitzada](#reobrir-una-conversa-finalitzada)) |
 | `ERROR` | Cal revisió humana (vegeu `darrer_error`) | Vegeu més avall |
 
 ### Missatges
@@ -77,7 +77,7 @@ El text que s'envia és la cel·la `missatge_inicial` de la pestanya **Escenaris
 
 ## Triar una conversa
 
-Les opcions **Atura la conversa seleccionada…** i **Reactiva la conversa seleccionada…** actuen sobre la fila seleccionada:
+Les opcions **Atura la conversa seleccionada…**, **Reactiva la conversa seleccionada…** i **Reobre la conversa seleccionada…** actuen sobre la fila seleccionada:
 
 1. Feu clic a **qualsevol cel·la de la fila** de la conversa a la pestanya **Converses** (no a la capçalera). També val una fila de la pestanya **Missatges**: s'agafa la conversa d'aquell missatge.
 2. Trieu l'opció del menú. El quadre de confirmació mostra la conversa triada: identificador, participant, escenari, estat, respostes i darrer error.
@@ -106,6 +106,18 @@ Executeu `reactivaAra` i després esborreu la funció. Per aturar-la, el mateix 
 ## Aturar una conversa a mà
 
 Seleccioneu-la i feu **Rèplica → Atura la conversa seleccionada…** → **Sí** (`tancaConversa`). La conversa passa a `FINALITZADA` sense enviar cap comiat. És necessari, per exemple, per tornar a iniciar una simulació amb el mateix participant.
+
+## Reobrir una conversa finalitzada
+
+Seleccioneu-la i feu **Rèplica → Reobre la conversa seleccionada…**. El quadre pregunta quantes respostes més pot enviar la clienta: d'1 a 6, o en blanc per a 2. Feu **D'acord**.
+
+- La conversa torna a `ACTIVA`, i la columna `max_torns_conversa` de Converses passa a ser les respostes que ja havia enviat més les noves. Aquest límit substitueix el `max_torns` de l'escenari només per a aquesta conversa.
+- Els correus que el participant hagi enviat mentre era tancada es registren i es responen a la propera revisió, tots junts en una sola resposta.
+- La clienta rep una indicació perquè reprengui la conversa amb naturalitat després del seu comiat. Pot tornar-la a tancar abans d'hora si no hi ha res nou a tractar. El darrer torn permès la tanca sempre, com en qualsevol conversa.
+- No es pot reobrir si el participant té una altra conversa oberta del mateix escenari, ni si la seva adreça no està activa a Participants.
+- Cal la columna `max_torns_conversa`: si falta, feu **Rèplica → Configuració → Prepara el full**.
+
+Des de l'editor: `reobreConversa('ID')` (2 respostes més) o `reobreConversa('ID', 3)`, amb una funció temporal com la de l'apartat anterior.
 
 ## Revisió automàtica (disparador)
 

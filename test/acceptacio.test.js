@@ -50,7 +50,7 @@ test('Inicialització: afegeix columnes que falten sense esborrar dades', () => 
   full.dades = [['id_conversa', 'id_escenari'], ['x', 'ESC-001']];
   e.g.preparaFulls();
   assert.equal(full.dades[1][0], 'x');
-  assert.equal(full.dades[0].length, 10);
+  assert.equal(full.dades[0].length, 11);
 });
 
 test('Configuració incompleta: error llegible i sense exposar secrets', () => {
@@ -391,6 +391,86 @@ test('Límit de torns: el darrer torn tanca la conversa i no hi ha més resposte
   const [c] = e.converses();
   assert.equal(c.estat, 'FINALITZADA');
   assert.equal(c.torns_ia, '2');
+});
+
+test('Reobrir una conversa resolta abans del límit: respon el que ha arribat i compta les respostes extra', () => {
+  const e = entornIniciat();
+  e.gmail.respon(e.conversa.threadId, PARTICIPANT, 'Les caixes surten avui i us apliquem un 5 % de descompte.');
+  e.respostesIA(respostaGemini('Bon dia,\n\nD\'acord, ho accepto. Gràcies per la rapidesa.\n\nAtentament,\nMarta Soler', true));
+  e.g.processaCorreusPendents();
+  assert.equal(e.converses()[0].estat, 'FINALITZADA');
+  // El participant escriu mentre és tancada: no es respon.
+  e.gmail.respon(e.conversa.threadId, PARTICIPANT, 'Una pregunta més: voleu també la factura rectificativa?');
+  e.g.processaCorreusPendents();
+  assert.equal(e.gmail.enviats.length, 2);
+
+  const r = e.g.reobreConversa(e.conversa.idConversa, 2);
+  assert.equal(r.maxTorns, 3); // 1 resposta feta + 2 de noves
+  let [c] = e.converses();
+  assert.equal(c.estat, 'ACTIVA');
+  assert.equal(c.max_torns_conversa, '3');
+
+  e.g.processaCorreusPendents();
+  assert.equal(e.gmail.enviats.length, 3);
+  const segona = e.peticionsIA()[1].cos;
+  assert.match(segona.input, /factura rectificativa/);
+  assert.match(segona.system_instruction, /t'ha tornat a escriure/);
+  assert.doesNotMatch(segona.system_instruction, /DARRER MISSATGE/);
+
+  e.gmail.respon(e.conversa.threadId, PARTICIPANT, 'Us l\'enviem demà.');
+  e.g.processaCorreusPendents();
+  assert.match(e.peticionsIA()[2].cos.system_instruction, /DARRER MISSATGE/);
+  assert.doesNotMatch(e.peticionsIA()[2].cos.system_instruction, /t'ha tornat a escriure/);
+  [c] = e.converses();
+  assert.equal(c.estat, 'FINALITZADA');
+  assert.equal(c.torns_ia, '3');
+});
+
+test('Reobrir una conversa que havia arribat al límit de torns', () => {
+  const e = creaEntorn();
+  e.g.preparaFulls();
+  const escenaris = e.full('Escenaris');
+  escenaris.dades[1][escenaris.dades[0].indexOf('max_torns')] = 1;
+  const r = e.g.iniciaSimulacio(PARTICIPANT, 'ESC-001');
+  e.gmail.respon(r.threadId, PARTICIPANT, 'Primera proposta.');
+  e.g.processaCorreusPendents();
+  assert.equal(e.converses()[0].estat, 'FINALITZADA');
+  e.g.reobreConversa(r.idConversa); // per defecte, 2
+  e.gmail.respon(r.threadId, PARTICIPANT, 'Segona proposta.');
+  e.g.processaCorreusPendents();
+  assert.equal(e.converses()[0].estat, 'ACTIVA');
+  e.gmail.respon(r.threadId, PARTICIPANT, 'Tercera proposta.');
+  e.g.processaCorreusPendents();
+  e.gmail.respon(r.threadId, PARTICIPANT, 'Quarta proposta.');
+  e.g.processaCorreusPendents();
+  const [c] = e.converses();
+  assert.equal(c.estat, 'FINALITZADA');
+  assert.equal(c.torns_ia, '3');
+  assert.equal(e.peticionsIA().length, 3);
+});
+
+test('Reobrir: només converses finalitzades, sense una altra d\'oberta i amb valors vàlids', () => {
+  const e = entornIniciat();
+  const id = e.conversa.idConversa;
+  assert.throws(() => e.g.reobreConversa(id, 2), /Només es poden reobrir les converses finalitzades/);
+  e.g.tancaConversa(id);
+  assert.throws(() => e.g.reobreConversa(id, 0), /entre 1 i 6/);
+  assert.throws(() => e.g.reobreConversa(id, 7), /entre 1 i 6/);
+  assert.throws(() => e.g.reobreConversa(id, 1.5), /entre 1 i 6/);
+  const nova = e.g.iniciaSimulacio(PARTICIPANT, 'ESC-001');
+  assert.throws(() => e.g.reobreConversa(id, 2), new RegExp('ja té una altra conversa oberta.*' + nova.idConversa));
+  e.g.tancaConversa(nova.idConversa);
+  assert.equal(e.g.reobreConversa(id, 2).estat, 'ACTIVA');
+});
+
+test('Reobrir: sense la columna max_torns_conversa, demana Prepara el full', () => {
+  const e = entornIniciat();
+  e.g.tancaConversa(e.conversa.idConversa);
+  const converses = e.full('Converses');
+  const col = converses.dades[0].indexOf('max_torns_conversa');
+  converses.dades.forEach((fila) => fila.splice(col, 1));
+  assert.throws(() => e.g.reobreConversa(e.conversa.idConversa, 2), /Prepara el full/);
+  assert.equal(e.converses()[0].estat, 'FINALITZADA');
 });
 
 test('Interruptor global desactivat: cap processament ni enviament', () => {

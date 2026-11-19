@@ -201,6 +201,8 @@ Quan hi hagi una versió nova del programa:
 
 Les propietats, el full de càlcul, la clau i la revisió automàtica es conserven: no cal tornar-los a configurar.
 
+> ℹ️ **Per poder reobrir converses** cal la columna `max_torns_conversa` a la pestanya Converses. La crea **Prepara el full** (pas 3 d'aquí dalt). Si no la feu, l'opció **Reobre…** us ho recordarà.
+
 > ℹ️ **Si veniu de la versió amb les files `participant` i `escenari` a la pestanya Configuració**: **Prepara el full** crea les pestanyes **Participants** (amb les adreces d'`ALLOWED_SENDERS`, si hi era) i **Activacions**, i treu aquelles dues files de Configuració. A partir d'ara les simulacions s'envien des de la pestanya **Activacions** (secció 6). Després podeu esborrar la propietat `ALLOWED_SENDERS`.
 
 > ❗ **Si teníeu la instal·lació antiga amb 10 fitxers separats** (`AiProvider.gs`, `Config.gs`, `Main.gs`…), suprimiu-los **tots** (tres punts → **Suprimeix**) i deixeu només `appsscript.json` i `Replica.gs`. Si en queda algun d'antic, el programa podria barrejar versions.
@@ -284,6 +286,7 @@ Tot es fa des del menú **Rèplica** del full de càlcul, havent entrat amb el *
 | **Revisa ara les respostes** | Mira la bústia ara mateix i respon el que estigui pendent, sense esperar la revisió automàtica. |
 | **Atura la conversa seleccionada…** | Tanca una conversa sense enviar cap comiat (passa a `FINALITZADA`). |
 | **Reactiva la conversa seleccionada…** | Torna a `ACTIVA` una conversa en `ERROR`, després de revisar-la. |
+| **Reobre la conversa seleccionada…** | Torna a obrir una conversa `FINALITZADA` i deixa que la clienta hi enviï unes quantes respostes més (2, si no dieu cap altre nombre). |
 | **Estat de les converses** | Resum: si les simulacions estan activades, cada quan es revisa la bústia i les converses obertes. |
 | **Simulacions ACTIVADES · Atura-les totes…** | **Interruptor general**: atura tot de seguida. No es respon ni s'envia res fins que es torni a activar. |
 | **Simulacions ATURADES · Activa-les…** | Torna a engegar-ho (només amb la confirmació del coordinador). |
@@ -318,13 +321,20 @@ Què heu de saber:
 - **Si la fila queda `PARCIAL`** (algun enviament ha fallat), la columna resultat diu a qui i per què. Quan ho hàgiu resolt, torneu a enviar **la mateixa fila**: només s'enviarà a qui falti.
 - **Si l'activació faria passar del límit de correus del dia**, no s'envia i el quadre diu quants en queden (vegeu la [secció 7](#7-límits-de-gmail-i-de-gemini)).
 
-### Aturar o reactivar una conversa
+### Aturar, reactivar o reobrir una conversa
 
 1. Aneu a la pestanya **Converses** i feu clic a **qualsevol cel·la de la fila** de la conversa (no a la capçalera). També podeu fer clic a una fila de la pestanya **Missatges**: s'agafarà la conversa d'aquell missatge.
-2. Trieu **Rèplica** → **Atura la conversa seleccionada…** (o **Reactiva…**).
-3. El quadre mostra la conversa triada (participant, estat, respostes i darrer error). Si és la correcta, feu clic a **Sí**.
+2. Trieu **Rèplica** → **Atura la conversa seleccionada…** (o **Reactiva…**, o **Reobre…**).
+3. El quadre mostra la conversa triada (participant, estat, respostes i darrer error). Si és la correcta, feu clic a **Sí** (o **D'acord**).
 
 Abans de **reactivar** una conversa en `ERROR`, obriu el fil a la bústia de prova (Gmail) i comproveu que la darrera resposta de la clienta **no** s'ha enviat. Si sí que s'ha enviat, no la reactiveu: atureu-la, per no duplicar la resposta.
+
+**Reobrir** serveix per a les converses `FINALITZADA`: les que la clienta va donar per acabades, les que van arribar al màxim de respostes i les que vau aturar a mà.
+
+- El quadre pregunta **quantes respostes més** pot enviar la clienta (d'1 a 6). Si el deixeu en blanc, són **2**. Es compten a partir de les que ja ha enviat: si en portava 3, amb 2 més en podrà enviar fins a 5.
+- Si el participant **va escriure mentre la conversa era tancada**, la clienta li respondrà a la propera revisió (o ara mateix, amb **Revisa ara les respostes**). Si va escriure més d'un correu, li respon tots junts en un de sol. Si no havia escrit res, la clienta espera el seu proper correu.
+- La clienta sap que havia acabat la conversa i la reprèn amb naturalitat. Si no hi ha res de nou a tractar, la pot tornar a tancar abans d'esgotar les respostes. Una conversa es pot reobrir tantes vegades com calgui.
+- No es pot reobrir si el participant ja té **una altra conversa oberta del mateix escenari**: atureu-la primer.
 
 ### Treballar amb altres docents
 

@@ -47,6 +47,9 @@ var Config = (function () {
     INTERVALS_PERMESOS: [1, 5, 10, 15, 30],
     MAX_TORNS_PER_DEFECTE: 6,
     MAX_TORNS_ABSOLUT: 12,
+    // Respostes que es poden afegir cada vegada que es reobre una conversa.
+    RESPOSTES_EXTRA_PER_DEFECTE: 2,
+    MAX_RESPOSTES_EXTRA: 6,
     // Respostes de la IA per execució (totes les converses es llegeixen).
     MAX_RESPOSTES_PER_EXECUCIO: 10,
     MAX_DESTINATARIS_PER_ACTIVACIO: 50,

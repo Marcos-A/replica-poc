@@ -49,6 +49,12 @@ var Indicacions = (function () {
       '- Marca "finalitzada": true només si el teu missatge tanca la situació: has acceptat una solució concreta i et dones per satisfeta, o has decidit acabar la conversa (per exemple, perquè derives la qüestió a un responsable). En aquest cas, escriu un comiat versemblant.',
       '- En qualsevol altre cas, "finalitzada": false.'
     ];
+    if (o.represa) {
+      linies.push(
+        '- Havies donat la conversa per acabada, però el proveïdor t\'ha tornat a escriure. Reprèn-la amb naturalitat ' +
+        'a partir del que diu ara, sense repetir el comiat anterior. Si no hi ha res nou a tractar, pots tornar a tancar-la.'
+      );
+    }
     if (o.darrerTorn) {
       linies.push(
         '- AQUEST ÉS EL TEU DARRER MISSATGE en aquesta conversa: tanca-la de manera coherent amb el que s\'ha parlat ' +
@@ -107,12 +113,12 @@ var Indicacions = (function () {
   }
 
   /**
-   * context: { escenari, historial, missatgesNous, configuracio: { darrerTorn } }
+   * context: { escenari, historial, missatgesNous, configuracio: { darrerTorn, represa } }
    */
   function construeix(context) {
     var conf = context.configuracio || {};
     return {
-      sistema: construeixSistema(context.escenari, { darrerTorn: !!conf.darrerTorn }),
+      sistema: construeixSistema(context.escenari, { darrerTorn: !!conf.darrerTorn, represa: !!conf.represa }),
       entrada: construeixEntrada(context.escenari, context.historial, context.missatgesNous)
     };
   }

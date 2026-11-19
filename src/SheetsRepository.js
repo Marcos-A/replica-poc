@@ -37,7 +37,9 @@ var Repositori = (function () {
     ],
     Converses: [
       'id_conversa', 'id_escenari', 'correu_participant', 'gmail_thread_id', 'estat',
-      'torns_ia', 'data_inici', 'data_actualitzacio', 'darrer_error', 'id_activacio'
+      'torns_ia', 'data_inici', 'data_actualitzacio', 'darrer_error', 'id_activacio',
+      // Límit de respostes d'aquesta conversa quan s'ha reobert; buit = el de l'escenari.
+      'max_torns_conversa'
     ],
     // respon_a i tanca_conversa amplien l'especificació: permeten saber quins
     // missatges del participant ja tenen resposta i reconciliar un enviament
@@ -575,7 +577,8 @@ var Repositori = (function () {
       data_inici: String(d.data_inici || ''),
       data_actualitzacio: String(d.data_actualitzacio || ''),
       darrer_error: String(d.darrer_error || ''),
-      id_activacio: String(d.id_activacio || '')
+      id_activacio: String(d.id_activacio || ''),
+      max_torns_conversa: Number(d.max_torns_conversa) || 0
     };
   }
 
@@ -638,6 +641,12 @@ var Repositori = (function () {
     SpreadsheetApp.flush();
   }
 
+  /** Columnes d'una pestanya que encara no existeixen (cal Prepara el full). */
+  function columnesQueFalten(nom) {
+    var actual = capcalera_(full_(nom));
+    return COLUMNES[nom].filter(function (c) { return actual.indexOf(c) === -1; });
+  }
+
   /** Diagnòstic per a comprovaConfiguracio(). */
   function diagnostica() {
     var llibre = llibre_();
@@ -683,6 +692,7 @@ var Repositori = (function () {
     afegeixMissatge: afegeixMissatge,
     actualitzaMissatge: actualitzaMissatge,
     confirma: confirma,
+    columnesQueFalten: columnesQueFalten,
     diagnostica: diagnostica
   };
 })();

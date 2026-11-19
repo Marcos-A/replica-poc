@@ -27,6 +27,11 @@ var Simulacio = (function () {
     return String(escenari.interlocutor || '').split(',')[0].trim();
   }
 
+  /** Respostes que pot enviar la clienta en aquesta conversa. */
+  function maxTorns_(c, escenari) {
+    return c.max_torns_conversa || escenari.max_torns;
+  }
+
   function ambBloqueig_(funcio) {
     var bloqueig = LockService.getScriptLock();
     if (!bloqueig.tryLock(Config.LIMITS.ESPERA_BLOQUEIG_MS)) return { bloquejat: true };
@@ -241,7 +246,8 @@ var Simulacio = (function () {
     // 2. Hi ha alguna intervenció pendent?
     var pendents = pendentsDeResposta(registrats);
     if (pendents.length === 0) return 'SENSE_CANVIS';
-    if (c.torns_ia >= escenari.max_torns) {
+    var maxTorns = maxTorns_(c, escenari);
+    if (c.torns_ia >= maxTorns) {
       Repositori.actualitzaConversa(c.id_conversa, { estat: E_().FINALITZADA });
       return 'FINALITZADA';
     }
@@ -252,12 +258,15 @@ var Simulacio = (function () {
       return 'LIMIT_DIARI';
     }
     ctx.generades++;
-    var darrerTorn = c.torns_ia + 1 >= escenari.max_torns;
+    var darrerTorn = c.torns_ia + 1 >= maxTorns;
     var historial = registrats.filter(function (m) {
       if (pendents.indexOf(m) !== -1) return false;
       if (m.rol === R_().INTERLOCUTOR) return m.estat_enviament === M_().ENVIAT;
       return m.estat_enviament === M_().REBUT;
     });
+    // Conversa reoberta: el darrer correu de la clienta l'havia tancat.
+    var enviades = historial.filter(function (m) { return m.rol === R_().INTERLOCUTOR; });
+    var represa = enviades.length > 0 && enviades[enviades.length - 1].tanca_conversa;
 
     Repositori.actualitzaConversa(c.id_conversa, { estat: E_().PROCESSANT });
     Repositori.confirma();
@@ -269,7 +278,7 @@ var Simulacio = (function () {
         escenari: escenari,
         historial: historial,
         missatgesNous: pendents,
-        configuracio: { darrerTorn: darrerTorn, torn: c.torns_ia + 1, maxTorns: escenari.max_torns }
+        configuracio: { darrerTorn: darrerTorn, represa: represa, torn: c.torns_ia + 1, maxTorns: maxTorns }
       });
     } catch (e) {
       var estat = e.reintentable ? E_().ACTIVA : E_().ERROR;
@@ -457,8 +466,51 @@ var Simulacio = (function () {
     return execucio.resultat;
   }
 
+  /**
+   * Torna a obrir una conversa FINALITZADA i li permet `respostesExtra`
+   * respostes més, comptades a partir de les que ja ha enviat la clienta.
+   * Els missatges que el participant hagi enviat mentre era tancada es
+   * respondran a la propera revisió (tots junts, en una sola resposta).
+   */
+  function reobre(idConversa, respostesExtra) {
+    var extra = Number(respostesExtra);
+    if (!(Math.floor(extra) === extra && extra >= 1 && extra <= Config.LIMITS.MAX_RESPOSTES_EXTRA)) {
+      throw new Error('El nombre de respostes ha de ser un nombre enter entre 1 i ' + Config.LIMITS.MAX_RESPOSTES_EXTRA + '.');
+    }
+    if (Repositori.columnesQueFalten(Repositori.FULLS.CONVERSES).indexOf('max_torns_conversa') !== -1) {
+      throw new Error('Falta la columna max_torns_conversa a la pestanya Converses. Feu Rèplica › Configuració › ' +
+        'Prepara el full i torneu-ho a provar.');
+    }
+    var execucio = ambBloqueig_(function () {
+      var c = Repositori.conversa(idConversa);
+      if (!c) throw new Error('No existeix la conversa ' + idConversa + '.');
+      if (c.estat !== E_().FINALITZADA) {
+        throw new Error('Només es poden reobrir les converses finalitzades (estat actual: ' + c.estat + ').');
+      }
+      if (!c.gmail_thread_id) throw new Error('La conversa no té fil de Gmail: no es pot reobrir.');
+      var altra = Repositori.converses([E_().ACTIVA, E_().PROCESSANT, E_().ERROR]).filter(function (o) {
+        return o.correu_participant === c.correu_participant && o.id_escenari === c.id_escenari;
+      });
+      if (altra.length > 0) {
+        throw new Error('Aquest participant ja té una altra conversa oberta d\'aquest escenari (' + altra[0].id_conversa +
+          '). Atureu-la abans de reobrir aquesta.');
+      }
+      if (!Repositori.esParticipantActiu(c.correu_participant)) {
+        throw new Error('L\'adreça del participant no és a la pestanya Participants o no hi té marcada la casella actiu: ' +
+          'la clienta no li respondria. Marqueu-la i torneu-ho a provar.');
+      }
+      var max = c.torns_ia + extra;
+      Repositori.actualitzaConversa(idConversa, { estat: E_().ACTIVA, max_torns_conversa: max, darrer_error: '' });
+      Registre.info('Conversa reoberta', { idConversa: idConversa, respostesExtra: extra, maxTorns: max });
+      return { idConversa: idConversa, estat: E_().ACTIVA, maxTorns: max };
+    });
+    if (execucio.bloquejat) throw new Error('Hi ha una altra execució en curs. Torna-ho a provar d\'aquí a un minut.');
+    return execucio.resultat;
+  }
+
   return {
     inicia: inicia,
+    reobre: reobre,
     correusDisponibles: correusDisponibles,
     processaPendents: processaPendents,
     pendentsDeResposta: pendentsDeResposta,

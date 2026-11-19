@@ -42,10 +42,10 @@ test('Menú: onOpen crea el menú Rèplica i cada opció crida una funció que e
   e.g.onOpen();
   assert.equal(e.ui.menu.titol, 'Rèplica');
   const opcions = e.ui.opcions();
-  assert.equal(opcions.length, 11);
+  assert.equal(opcions.length, 12);
   opcions.forEach(([text, funcio]) => assert.equal(typeof e.g[funcio], 'function', text + ' → ' + funcio));
   const funcions = opcions.map((o) => o[1]);
-  ['menuEnviaActivacio', 'menuRevisaAra', 'menuAturaConversa', 'menuReactivaConversa', 'menuEstatConverses',
+  ['menuEnviaActivacio', 'menuRevisaAra', 'menuAturaConversa', 'menuReactivaConversa', 'menuReobreConversa', 'menuEstatConverses',
     'menuCreaDisparador', 'menuEliminaDisparadors', 'menuComprovaConfiguracio',
     'menuPreparaFull', 'menuDesaClauGemini'].forEach((f) => assert.ok(funcions.includes(f), f));
 });
@@ -360,6 +360,38 @@ test('Reactiva la conversa seleccionada: només en ERROR i després d\'avisar de
   e.g.menuReactivaConversa();
   assert.equal(e.converses()[0].estat, 'ACTIVA');
   assert.equal(e.converses()[0].darrer_error, '');
+});
+
+test('Reobre la conversa seleccionada: només finalitzades, demana quantes respostes i valida el nombre', () => {
+  const e = entornMenu();
+  const c = ambConversa(e);
+  e.llibre.selecciona('Converses', 2);
+  e.g.menuReobreConversa();
+  assert.match(e.ui.darrer().text, /Només es poden reobrir les converses finalitzades/);
+
+  e.g.tancaConversa(c.id_conversa);
+  e.ui.textos.push(['CANCEL', ''], ['OK', 'tres'], ['OK', '9']);
+  e.g.menuReobreConversa();
+  e.g.menuReobreConversa();
+  assert.match(e.ui.darrer().text, /«tres» no és vàlid/);
+  e.g.menuReobreConversa();
+  assert.match(e.ui.darrer().text, /«9» no és vàlid/);
+  assert.equal(e.converses()[0].estat, 'FINALITZADA');
+
+  e.ui.textos.push(['OK', '']);
+  e.g.menuReobreConversa();
+  assert.equal(e.converses()[0].estat, 'ACTIVA');
+  assert.equal(e.converses()[0].max_torns_conversa, '2');
+  assert.match(e.ui.darrer().text, /pot enviar 2 resposta\(es\) més \(fins a 2 en total\)/);
+});
+
+test('Reobre: una conversa en ERROR remet a Reactiva', () => {
+  const e = entornMenu();
+  const c = ambConversa(e);
+  e.g.Repositori.actualitzaConversa(c.id_conversa, { estat: 'ERROR', darrer_error: 'x' });
+  e.llibre.selecciona('Converses', 2);
+  e.g.menuReobreConversa();
+  assert.match(e.ui.darrer().text, /Reactiva la conversa seleccionada/);
 });
 
 // ------------------------------------------------- Interruptor i revisió
