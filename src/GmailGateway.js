@@ -36,6 +36,19 @@ var Bustia = (function () {
   }
 
   /**
+   * Cert si la línia `i` comença una capçalera de cita "Missatge de … del dia
+   * …:" que acaba, com a molt, tres línies més avall.
+   */
+  function esCapcaleraMissatgeDe_(linies, i) {
+    var text = '';
+    for (var k = i; k < Math.min(linies.length, i + 4); k++) {
+      text += (text ? ' ' : '') + linies[k].trim();
+      if (/\sdel d[ií]a\s[\s\S]*:$/i.test(text)) return true;
+    }
+    return false;
+  }
+
+  /**
    * Neteja el text pla d'una resposta: elimina el text citat, les
    * signatures habituals i les línies "Enviat des del meu mòbil".
    */
@@ -54,6 +67,9 @@ var Bustia = (function () {
         tall = i;
         break;
       }
+      // Gmail en català i castellà: "Missatge de Nom <a@b.cat> del dia dj., 19 de
+      // nov. 2026 a les 17:26:" (sovint partit en diverses línies).
+      if (/^\s*(Missatge|Mensaje) de\s/i.test(l) && esCapcaleraMissatgeDe_(linies, i)) { tall = i; break; }
       if (/^_{10,}\s*$/.test(l)) { tall = i; break; }
       if (/^\s*(De|From)\s*:\s*\S/.test(l) &&
           linies.slice(i + 1, i + 4).some(function (s) { return /^\s*(Enviat|Enviado|Sent|Data|Fecha|Date|Per a|Para|To)\s*:/i.test(s); })) {

@@ -22,6 +22,14 @@ test('netejaCos: elimina cites, signatures i peus de mòbil', () => {
   assert.equal(g.Bustia.netejaCos('Text\nOn Wed, Nov 19, 2026 at 10:00 AM Marta\n<x@y.cat> wrote:\n> cita'), 'Text');
   assert.equal(g.Bustia.netejaCos('Text\n\nDe: Marta Soler\nEnviat: dimecres\nPer a: jo\nAssumpte: x'), 'Text');
   assert.equal(g.Bustia.netejaCos('a'.repeat(5000)).length, 4000 + ' […]'.length);
+  // Capçalera de Gmail en català, partida en diverses línies.
+  assert.equal(g.Bustia.netejaCos([
+    'Hola Laura,', '', 'Fins demà,', 'Marcos A', '',
+    'Missatge de Laura Vidal <x@y.cat> del', 'dia dj., 19 de', 'nov. 2026 a les 17:26:', '', '> Hola Marcos,'
+  ].join('\n')), 'Hola Laura,\n\nFins demà,\nMarcos A');
+  assert.equal(g.Bustia.netejaCos('Text\n\nMensaje de Laura Vidal <x@y.cat> del día jue, 19 nov 2026 a las 17:26:\n> cita'), 'Text');
+  // Una frase que comença igual però no és cap capçalera es conserva.
+  assert.equal(g.Bustia.netejaCos('Missatge de confirmació: tot correcte.\nGràcies'), 'Missatge de confirmació: tot correcte.\nGràcies');
 });
 
 test('esAutomatic', () => {
