@@ -340,7 +340,7 @@ Abans de **reactivar** una conversa en `ERROR`, obriu el fil a la bústia de pro
 
 Podeu compartir el full de càlcul amb altres docents perquè segueixin les converses o hi afegeixin participants:
 
-- **Només el compte de prova pot fer servir el menú Rèplica.** Les opcions s'executen amb el compte de qui hi fa clic, i els correus sortirien del seu Gmail. Per això el programa ho comprova i, si és un altre compte, no fa res i ho explica.
+- **Només el compte de prova pot fer servir el menú Rèplica.** Compartir el full, **encara que sigui amb permís d'edició**, no permet enviar activacions ni revisar respostes. Les opcions s'executen amb el compte de qui hi fa clic, i els correus sortirien del seu Gmail. Per això el programa ho comprova i, si és un altre compte, no fa res i ho explica. Si un altre docent ha d'enviar activacions, ha d'entrar amb el compte de prova (per exemple, en una finestra d'incògnit).
 - Si un altre docent fa clic al menú, Google li pot demanar que autoritzi l'aplicació. **Ha de fer clic a Cancel·la**: no cal, i el menú no li funcionaria igualment.
 - **Qui pot editar el full pot afegir participants i també pot obrir Apps Script** (Extensions → Apps Script), veure-hi el codi i les propietats, i canviar-los. Compartiu-lo amb permís d'edició **només amb persones de confiança**. Si algú només ha de mirar, doneu-li permís de **lectura**: no veurà el menú ni el codi.
 
@@ -384,6 +384,7 @@ Amb un compte de Gmail, Google limita el temps total que el programa es pot exec
 | El menú **Rèplica** no apareix | El full no s'ha recarregat després d'enganxar el codi, o el codi no s'ha desat | Recarregueu la pàgina i espereu uns segons. Comproveu a **Extensions** → **Apps Script** que `Replica.gs` està desat i sencer (pas 3.4) |
 | El menú no apareix a un altre docent | És intencionat si Google sap que no és el compte de prova | Només el compte de prova fa servir el menú (vegeu [Treballar amb altres docents](#treballar-amb-altres-docents)) |
 | `Només el compte de prova (…) pot fer servir Rèplica` | Heu obert el full amb un altre compte | Obriu el full havent entrat **només** amb el compte de prova (per exemple, en una finestra d'incògnit) |
+| `El programa no ha pogut obrir aquest full amb el compte …` | Feu servir un compte que no és el de prova, o el navegador té diversos comptes de Google oberts i Google executa el programa amb el principal | Obriu el full en una finestra d'incògnit havent entrat **només** amb el compte de prova |
 | `No es pot saber de qui és el full de càlcul` | El full és en una unitat compartida | Creeu el full a **El meu Drive** del compte de prova |
 | Després d'autoritzar, no passa res | Google no executa l'opció la primera vegada | Torneu a fer clic a la mateixa opció del menú |
 | `Les simulacions estan aturades` | L'interruptor general està apagat | **Rèplica** → **Simulacions ATURADES · Activa-les…** |

@@ -275,6 +275,7 @@ function creaUi() {
  * opcions:
  * - propietats: Script Properties (se sumen a les de per defecte).
  * - vinculat: el projecte és vinculat al full (getActiveSpreadsheet el retorna).
+ * - errorVinculat: getActiveSpreadsheet llança aquest error (compte sense accés al full).
  * - usuari: compte que executa (getEffectiveUser). Per defecte, la bústia.
  * - usuariActiu: getActiveUser en l'activador simple ('' com amb Gmail).
  * - propietari: propietari del full (null: unitat compartida). Per defecte, la bústia.
@@ -323,7 +324,10 @@ function creaEntorn(opcions = {}) {
     },
     SpreadsheetApp: {
       openById: (id) => { if (id !== 'full-de-prova') throw new Error('No es troba el full'); return llibre; },
-      getActiveSpreadsheet: () => (opcions.vinculat ? llibre : null),
+      getActiveSpreadsheet: () => {
+        if (opcions.errorVinculat) throw new Error(opcions.errorVinculat);
+        return opcions.vinculat ? llibre : null;
+      },
       getUi: () => ui,
       flush: () => {},
       newDataValidation: () => {

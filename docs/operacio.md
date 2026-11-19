@@ -8,7 +8,7 @@ Si el programa està instal·lat com a projecte independent (sense menú), les m
 
 Només el **compte de prova**. Les opcions s'executen amb el compte de qui hi fa clic: amb un altre compte, els correus sortirien del seu Gmail. El programa ho comprova abans de fer res i, si no és el compte de prova, ho explica i no fa res. La revisió automàtica fa la mateixa comprovació.
 
-Els altres docents poden tenir el full compartit per seguir les converses o canviar la pestanya Configuració. Si fan clic al menú i Google els demana autorització, han de fer clic a **Cancel·la**. Tingueu en compte que qui pot editar el full també pot obrir Apps Script i veure'n el codi i les propietats: compartiu-lo amb permís d'edició només amb persones de confiança, i amb permís de lectura amb la resta.
+Els altres docents poden tenir el full compartit per seguir les converses o canviar la pestanya Configuració, però el permís d'edició no els deixa fer servir el menú: si han d'enviar activacions, han d'entrar amb el compte de prova. Si el programa no pot ni obrir el full amb el compte de qui fa clic (per exemple, perquè el navegador té diversos comptes oberts i Google fa servir el principal), el quadre ho diu així i recomana una finestra d'incògnit amb només el compte de prova. Si fan clic al menú i Google els demana autorització, han de fer clic a **Cancel·la**. Tingueu en compte que qui pot editar el full també pot obrir Apps Script i veure'n el codi i les propietats: compartiu-lo amb permís d'edició només amb persones de confiança, i amb permís de lectura amb la resta.
 
 ## Interruptor general
 

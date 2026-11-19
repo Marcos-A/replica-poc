@@ -74,13 +74,31 @@ var Menu = (function () {
       exigeixModuls_();
       var compte = Compte.comprova();
       if (!compte.correcte) {
-        avisa_(ui, titol, Registre.sanititza(compte.missatge));
+        avisa_(ui, titol, Registre.sanititza(compte.codi === Compte.CODIS.SENSE_FULL
+          ? textSenseFull_(compte) : compte.missatge));
         return;
       }
       accio(ui);
     } catch (e) {
       avisa_(ui, titol, 'No s\'ha pogut completar.\n\n' + Registre.sanititza(e && e.message ? e.message : String(e)));
     }
+  }
+
+  /**
+   * El menú només existeix dins del full: si el programa no el pot obrir, és
+   * que s'executa amb un compte que no hi té accés (sovint, un altre compte
+   * del navegador). Suggerir SPREADSHEET_ID aquí confondria.
+   */
+  function textSenseFull_(compte) {
+    return 'El programa no ha pogut obrir aquest full amb el compte ' +
+      (compte.actual ? compte.actual + ' ' : '') + 'amb què s\'està executant.\n\n' +
+      'Només el compte de prova, propietari del full, pot fer servir el menú Rèplica. Compartir el full, ' +
+      'encara que sigui amb permís d\'edició, permet veure\'l i modificar-lo, però no enviar activacions ni ' +
+      'revisar respostes: els correus sortirien del Gmail de qui fa clic.\n\n' +
+      'Si heu entrat amb el compte de prova: passa sovint quan al navegador hi ha més d\'un compte de Google ' +
+      'obert, perquè Google executa el programa amb el compte principal. Obriu el full en una finestra ' +
+      'd\'incògnit havent entrat només amb el compte de prova.\n\n' +
+      'Detall: ' + compte.missatge;
   }
 
   function avisa_(ui, titol, text) {

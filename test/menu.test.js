@@ -101,6 +101,18 @@ test('Compte: un disparador creat per un altre compte no llegeix ni envia res', 
   assert.ok(e.registres.some((l) => /Revisió omesa: Només el compte de prova/.test(l)));
 });
 
+test('Compte: si el compte que executa no pot obrir el full, ho explica (sense parlar de SPREADSHEET_ID)', () => {
+  const e = creaEntorn({ usuari: COLLEGA, errorVinculat: 'Cal autorització per accedir al full', propietats: { SPREADSHEET_ID: '' } });
+  e.g.menuEnviaActivacio();
+  const text = e.ui.darrer().text;
+  assert.equal(e.gmail.enviats.length, 0);
+  assert.match(text, /no ha pogut obrir aquest full amb el compte d\*\*\*@example\.org/);
+  assert.match(text, /Només el compte de prova, propietari del full, pot fer servir el menú Rèplica/);
+  assert.match(text, /més d'un compte de Google obert/);
+  assert.match(text, /Detall: .*Cal autorització per accedir al full/);
+  assert.doesNotMatch(text, /SPREADSHEET_ID/);
+});
+
 test('Compte: un full sense propietari (unitat compartida) s\'explica', () => {
   const e = entornMenu({ propietari: null });
   e.g.menuEstatConverses();

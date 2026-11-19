@@ -463,8 +463,11 @@ var Disparador = (function () {
  * configurar res, i només el propietari pot canviar-lo.
  */
 var Compte = (function () {
-  function resultat_(correcte, actual, propietari, missatge) {
-    return { correcte: correcte, actual: actual, propietari: propietari, missatge: missatge || '' };
+  /** Motius de comprova() que el menú explica d'una altra manera. */
+  var CODIS = { SENSE_FULL: 'SENSE_FULL' };
+
+  function resultat_(correcte, actual, propietari, missatge, codi) {
+    return { correcte: correcte, actual: actual, propietari: propietari, missatge: missatge || '', codi: codi || '' };
   }
 
   function comprova() {
@@ -477,7 +480,8 @@ var Compte = (function () {
       var usuari = Repositori.llibre().getOwner();
       propietari = usuari ? Config.normalitzaCorreu(usuari.getEmail()) : '';
     } catch (e) {
-      return resultat_(false, actual, '', 'No s\'ha pogut obrir el full de càlcul: ' + Registre.resumError(e));
+      return resultat_(false, actual, '', 'No s\'ha pogut obrir el full de càlcul: ' + Registre.resumError(e),
+        CODIS.SENSE_FULL);
     }
     if (!propietari) {
       return resultat_(false, actual, '', 'No es pot saber de qui és el full de càlcul (passa, per exemple, si és en una ' +
@@ -503,7 +507,7 @@ var Compte = (function () {
     return r;
   }
 
-  return { comprova: comprova, exigeix: exigeix };
+  return { comprova: comprova, exigeix: exigeix, CODIS: CODIS };
 })();
 
 /** Torna a ACTIVA una conversa en ERROR (després de revisar-la). */

@@ -96,12 +96,16 @@ var Repositori = (function () {
   var PARAMETRES_OBSOLETS = ['participant', 'escenari'];
 
   var llibreEnMemoria_ = null;
+  // Error de Google en obrir el full vinculat (p. ex., el compte que executa
+  // no hi té accés): es mostra en lloc de suggerir SPREADSHEET_ID.
+  var errorVinculat_ = null;
 
   /** Full al qual està vinculat el projecte, o null si és independent. */
   function llibreVinculat_() {
     try {
       return SpreadsheetApp.getActiveSpreadsheet() || null;
     } catch (e) {
+      errorVinculat_ = e;
       return null;
     }
   }
@@ -113,6 +117,10 @@ var Repositori = (function () {
       llibreEnMemoria_ = SpreadsheetApp.openById(id);
     } else {
       llibreEnMemoria_ = llibreVinculat_();
+      if (!llibreEnMemoria_ && errorVinculat_) {
+        throw new Error('Google no deixa obrir el full on està instal·lat el programa: ' +
+          (errorVinculat_.message || String(errorVinculat_)));
+      }
       if (!llibreEnMemoria_) {
         throw new Error('No se sap quin full de càlcul fer servir. Instal·leu el programa des del full ' +
           '(Extensions › Apps Script) o afegiu la propietat SPREADSHEET_ID a les Propietats de l\'script.');

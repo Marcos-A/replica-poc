@@ -1787,8 +1787,11 @@ var Disparador = (function () {
  * configurar res, i només el propietari pot canviar-lo.
  */
 var Compte = (function () {
-  function resultat_(correcte, actual, propietari, missatge) {
-    return { correcte: correcte, actual: actual, propietari: propietari, missatge: missatge || '' };
+  /** Motius de comprova() que el menú explica d'una altra manera. */
+  var CODIS = { SENSE_FULL: 'SENSE_FULL' };
+
+  function resultat_(correcte, actual, propietari, missatge, codi) {
+    return { correcte: correcte, actual: actual, propietari: propietari, missatge: missatge || '', codi: codi || '' };
   }
 
   function comprova() {
@@ -1801,7 +1804,8 @@ var Compte = (function () {
       var usuari = Repositori.llibre().getOwner();
       propietari = usuari ? Config.normalitzaCorreu(usuari.getEmail()) : '';
     } catch (e) {
-      return resultat_(false, actual, '', 'No s\'ha pogut obrir el full de càlcul: ' + Registre.resumError(e));
+      return resultat_(false, actual, '', 'No s\'ha pogut obrir el full de càlcul: ' + Registre.resumError(e),
+        CODIS.SENSE_FULL);
     }
     if (!propietari) {
       return resultat_(false, actual, '', 'No es pot saber de qui és el full de càlcul (passa, per exemple, si és en una ' +
@@ -1827,7 +1831,7 @@ var Compte = (function () {
     return r;
   }
 
-  return { comprova: comprova, exigeix: exigeix };
+  return { comprova: comprova, exigeix: exigeix, CODIS: CODIS };
 })();
 
 /** Torna a ACTIVA una conversa en ERROR (després de revisar-la). */
@@ -1959,13 +1963,31 @@ var Menu = (function () {
       exigeixModuls_();
       var compte = Compte.comprova();
       if (!compte.correcte) {
-        avisa_(ui, titol, Registre.sanititza(compte.missatge));
+        avisa_(ui, titol, Registre.sanititza(compte.codi === Compte.CODIS.SENSE_FULL
+          ? textSenseFull_(compte) : compte.missatge));
         return;
       }
       accio(ui);
     } catch (e) {
       avisa_(ui, titol, 'No s\'ha pogut completar.\n\n' + Registre.sanititza(e && e.message ? e.message : String(e)));
     }
+  }
+
+  /**
+   * El menú només existeix dins del full: si el programa no el pot obrir, és
+   * que s'executa amb un compte que no hi té accés (sovint, un altre compte
+   * del navegador). Suggerir SPREADSHEET_ID aquí confondria.
+   */
+  function textSenseFull_(compte) {
+    return 'El programa no ha pogut obrir aquest full amb el compte ' +
+      (compte.actual ? compte.actual + ' ' : '') + 'amb què s\'està executant.\n\n' +
+      'Només el compte de prova, propietari del full, pot fer servir el menú Rèplica. Compartir el full, ' +
+      'encara que sigui amb permís d\'edició, permet veure\'l i modificar-lo, però no enviar activacions ni ' +
+      'revisar respostes: els correus sortirien del Gmail de qui fa clic.\n\n' +
+      'Si heu entrat amb el compte de prova: passa sovint quan al navegador hi ha més d\'un compte de Google ' +
+      'obert, perquè Google executa el programa amb el compte principal. Obriu el full en una finestra ' +
+      'd\'incògnit havent entrat només amb el compte de prova.\n\n' +
+      'Detall: ' + compte.missatge;
   }
 
   function avisa_(ui, titol, text) {
@@ -2516,12 +2538,16 @@ var Repositori = (function () {
   var PARAMETRES_OBSOLETS = ['participant', 'escenari'];
 
   var llibreEnMemoria_ = null;
+  // Error de Google en obrir el full vinculat (p. ex., el compte que executa
+  // no hi té accés): es mostra en lloc de suggerir SPREADSHEET_ID.
+  var errorVinculat_ = null;
 
   /** Full al qual està vinculat el projecte, o null si és independent. */
   function llibreVinculat_() {
     try {
       return SpreadsheetApp.getActiveSpreadsheet() || null;
     } catch (e) {
+      errorVinculat_ = e;
       return null;
     }
   }
@@ -2533,6 +2559,10 @@ var Repositori = (function () {
       llibreEnMemoria_ = SpreadsheetApp.openById(id);
     } else {
       llibreEnMemoria_ = llibreVinculat_();
+      if (!llibreEnMemoria_ && errorVinculat_) {
+        throw new Error('Google no deixa obrir el full on està instal·lat el programa: ' +
+          (errorVinculat_.message || String(errorVinculat_)));
+      }
       if (!llibreEnMemoria_) {
         throw new Error('No se sap quin full de càlcul fer servir. Instal·leu el programa des del full ' +
           '(Extensions › Apps Script) o afegiu la propietat SPREADSHEET_ID a les Propietats de l\'script.');
