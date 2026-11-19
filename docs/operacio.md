@@ -21,7 +21,7 @@ El text de l'opció mostra l'estat actual i canvia en fer clic. També es pot ca
 
 ## Participants
 
-La pestanya **Participants** té una fila per persona: `correu`, `actiu` (casella) i `notes` (lliure). Només es pot enviar una activació a qui hi és amb la casella **actiu** marcada, i la clienta només respon a aquestes persones. Desmarcar la casella d'algú atura les seves converses de fet: les respostes que enviï s'ignoren.
+La pestanya **Participants** té una fila per persona: `correu`, `actiu` (casella) i `notes` (lliure). Només es pot enviar una activació a qui hi és amb la casella **actiu** marcada, i el client només respon a aquestes persones. Desmarcar la casella d'algú atura les seves converses de fet: les respostes que enviï s'ignoren.
 
 ## Enviar una activació (iniciar simulacions)
 
@@ -87,7 +87,7 @@ Si no hi ha cap fila vàlida seleccionada (una altra pestanya, la capçalera, di
 ## Recuperar una conversa en ERROR
 
 1. Llegiu `darrer_error` a la pestanya **Converses**.
-2. Obriu el fil a la bústia de prova i comproveu si la darrera resposta de la clienta s'ha enviat o no.
+2. Obriu el fil a la bústia de prova i comproveu si la darrera resposta del client s'ha enviat o no.
 3. Corregiu la causa (clau, model, quota…) i feu **Rèplica → Configuració → Comprova la configuració**.
 4. Seleccioneu la conversa i feu **Rèplica → Reactiva la conversa seleccionada…** → **Sí**. Torna a `ACTIVA` i, a la propera revisió (o amb **Revisa ara les respostes**), es respon als missatges pendents.
 
@@ -109,11 +109,11 @@ Seleccioneu-la i feu **Rèplica → Atura la conversa seleccionada…** → **S�
 
 ## Reobrir una conversa finalitzada
 
-Seleccioneu-la i feu **Rèplica → Reobre la conversa seleccionada…**. El quadre pregunta quantes respostes més pot enviar la clienta: d'1 a 6, o en blanc per a 2. Feu **D'acord**.
+Seleccioneu-la i feu **Rèplica → Reobre la conversa seleccionada…**. El quadre pregunta quantes respostes més pot enviar el client: d'1 a 6, o en blanc per a 2. Feu **D'acord**.
 
 - La conversa torna a `ACTIVA`, i la columna `max_torns_conversa` de Converses passa a ser les respostes que ja havia enviat més les noves. Aquest límit substitueix el `max_torns` de l'escenari només per a aquesta conversa.
 - Els correus que el participant hagi enviat mentre era tancada es registren i es responen a la propera revisió, tots junts en una sola resposta.
-- La clienta rep una indicació perquè reprengui la conversa amb naturalitat després del seu comiat. Pot tornar-la a tancar abans d'hora si no hi ha res nou a tractar. El darrer torn permès la tanca sempre, com en qualsevol conversa.
+- El client rep una indicació perquè reprengui la conversa amb naturalitat després del seu comiat. Pot tornar-la a tancar abans d'hora si no hi ha res nou a tractar. El darrer torn permès la tanca sempre, com en qualsevol conversa.
 - No es pot reobrir si el participant té una altra conversa oberta del mateix escenari, ni si la seva adreça no està activa a Participants.
 - Cal la columna `max_torns_conversa`: si falta, feu **Rèplica → Configuració → Prepara el full**.
 

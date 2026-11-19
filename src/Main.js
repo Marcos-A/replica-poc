@@ -13,7 +13,7 @@ var MODULS_ = [
   ['ProveidorIA', 'AiProvider'],
   ['Config', 'Config'],
   ['Simulacio', 'ConversationService'],
-  ['ESCENARI_INICIAL', 'EscenariInicial'],
+  ['ESCENARIS', 'Escenaris'],
   ['Gemini', 'GeminiProvider'],
   ['Bustia', 'GmailGateway'],
   ['Registre', 'Logger'],
@@ -39,10 +39,10 @@ function exigeixModuls_() {
   if (falten.length) throw new Error('Codi incomplet a l\'editor:\n- ' + falten.join('\n- '));
 }
 
-/** Crea les pestanyes, capçaleres i l'escenari ESC-001 si falten. Idempotent. */
+/** Crea les pestanyes i capçaleres que falten i afegeix els escenaris que no hi són. Idempotent. */
 function preparaFulls() {
   exigeixModuls_();
-  var canvis = Repositori.preparaFulls(ESCENARI_INICIAL);
+  var canvis = Repositori.preparaFulls(ESCENARIS);
   var missatge = canvis.length ? 'Canvis:\n- ' + canvis.join('\n- ') : 'Tot ja estava preparat; no s\'ha canviat res.';
   Registre.info(missatge);
   return canvis;

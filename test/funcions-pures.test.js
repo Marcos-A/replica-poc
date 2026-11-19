@@ -108,7 +108,7 @@ test('Gemini.construeixPeticio: format de la petició', () => {
 
 test('Indicacions: anonimitza adreces i retalla historial llarg', () => {
   assert.equal(g.Indicacions.anonimitza('Escriu a a@b.cat'), 'Escriu a [adreça electrònica]');
-  const escenari = g.ESCENARI_INICIAL;
+  const escenari = g.ESCENARIS[0];
   const historial = Array.from({ length: 30 }, (_, i) => ({ rol: 'participant', contingut: String(i).padEnd(1500, '.') }));
   const entrada = g.Indicacions.construeixEntrada(escenari, historial, [{ contingut: 'nou' }]);
   assert.match(entrada, /S'han omès \d+ missatges antics/);

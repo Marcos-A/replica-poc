@@ -1,6 +1,6 @@
 # Rèplica · prova de concepte
 
-Simulador de correspondència comercial per correu electrònic. Cada participant rep un correu d'una **clienta fictícia** (Marta Soler, de Ferreteria Soler SL), que reclama per una comanda incompleta. Respon des del seu correu habitual, i la clienta li torna a contestar dins del mateix fil. Les respostes de la clienta les escriu la intel·ligència artificial **Gemini**.
+Simulador de correspondència comercial per correu electrònic. Cada participant rep un correu d'un **client fictici**, un personatge que defineix l'escenari: qui és, de quina empresa, què li ha passat i què vol aconseguir (per exemple, la Marta Soler, de Ferreteria Soler SL, que reclama per una comanda incompleta). Respon des del seu correu habitual, i el client li torna a contestar dins del mateix fil. Les respostes del client les escriu la intel·ligència artificial **Gemini**.
 
 Aquesta versió és una **prova de concepte** del departament d'Administració i Gestió. Serveix per comprovar que la mecànica funciona, amb poques persones a la vegada. **No** és la plataforma definitiva i **no** avalua ningú.
 
@@ -40,29 +40,29 @@ sequenceDiagram
 
     C->>F: Omple una activació i tria «Envia»
     F->>R: Escenari i destinataris
-    R->>P: Correu inicial de la clienta<br/>(un fil separat per a cada persona)
+    R->>P: Correu inicial del client<br/>(un fil separat per a cada persona)
     loop Fins al comiat o al màxim de respostes
         P->>R: Respon des del seu correu habitual
         Note over R: Cada pocs minuts revisa la bústia
         R->>G: La conversa, sense adreces de correu
-        G-->>R: La resposta de la clienta
+        G-->>R: La resposta del client
         R->>P: Respon dins del mateix fil
         R->>F: Desa la conversa
     end
 ```
 
-- Tot funciona dins de Google: **Google Sheets** (el full de càlcul, des d'on es fa servir tot amb el menú **Rèplica**), **Apps Script** (el programa, instal·lat dins del full) i **Gmail** (la bústia que envia els correus de la clienta).
-- Una **activació** és una fila del full: un escenari i una o més adreces. En enviar-la, cada persona rep el mateix correu inicial, però **en un fil separat**: ningú no veu les adreces ni les respostes dels altres. A partir d'aquí, cada conversa va per lliure, perquè la clienta respon al que ha escrit cada persona.
+- Tot funciona dins de Google: **Google Sheets** (el full de càlcul, des d'on es fa servir tot amb el menú **Rèplica**), **Apps Script** (el programa, instal·lat dins del full) i **Gmail** (la bústia que envia els correus del client).
+- Una **activació** és una fila del full: un escenari i una o més adreces. En enviar-la, cada persona rep el mateix correu inicial, però **en un fil separat**: ningú no veu les adreces ni les respostes dels altres. A partir d'aquí, cada conversa va per lliure, perquè el client respon al que ha escrit cada persona.
 - Les respostes **no són instantànies**: el programa mira la bústia cada 5 minuts. Es pot canviar (1, 5, 10, 15 o 30 minuts) a la pestanya **Configuració** del full de càlcul.
-- Cada conversa s'acaba quan la clienta queda satisfeta o quan s'arriba al màxim de 6 respostes. Llavors envia un comiat i ja no respon més.
+- Cada conversa s'acaba quan el client queda satisfet o quan s'arriba al màxim de 6 respostes. Llavors envia un comiat i ja no respon més.
 
 ## 2. Què necessites
 
 | Què | Per què | Notes |
 | --- | --- | --- |
-| **Un compte de Google de prova** (un compte de Gmail nou, per exemple «laboratori.prova.<nom del centre>») | Serà la bústia que envia els correus de la clienta, i la propietària del full de càlcul | Recomanat: un compte nou, només per a això. No feu servir el vostre correu personal ni el del centre. |
+| **Un compte de Google de prova** (un compte de Gmail nou, per exemple «laboratori.prova.<nom del centre>») | Serà la bústia que envia els correus del client, i la propietària del full de càlcul | Recomanat: un compte nou, només per a això. No feu servir el vostre correu personal ni el del centre. |
 | **Un coordinador o coordinadora** | Envia les activacions i supervisa | Fa servir el compte de prova. |
-| **Uns quants participants** | Responen a la clienta | Poden fer servir el seu correu habitual. Comenceu amb pocs: vegeu els [límits](#7-límits-de-gmail-i-de-gemini). |
+| **Uns quants participants** | Responen al client | Poden fer servir el seu correu habitual. Comenceu amb pocs: vegeu els [límits](#7-límits-de-gmail-i-de-gemini). |
 | **Una clau de Gemini** | Perquè la IA escrigui les respostes | Es crea gratis a Google AI Studio (pas 3.5). |
 | **Uns 45 minuts** | Per fer la instal·lació la primera vegada | |
 
@@ -153,7 +153,7 @@ Si no apareix al cap de mig minut, vegeu [Problemes freqüents](#8-problemes-fre
    - Sortirà l'avís «**Google no ha verificat aquesta aplicació**». És normal: l'aplicació és vostra. Feu clic a **Configuració avançada** → **Ves a Rèplica (no segur)**.
    - Accepteu els permisos: **Gmail** (enviar i llegir els correus de la simulació), **Fulls de càlcul** (desar les converses), **connexió a serveis externs** (parlar amb Gemini), **activadors** (revisar la bústia periòdicament) i **mostrar contingut en quadres de diàleg** (els missatges del menú Rèplica).
 3. Si després d'acceptar no passa res, torneu a fer clic a **Rèplica** → **Configuració** → **Prepara el full**.
-4. Sortirà un quadre amb els canvis («Pestanya creada…»). Al full hi veureu sis pestanyes: **Configuració**, **Participants**, **Activacions**, **Escenaris** (amb l'escenari ESC-001 ja carregat), **Converses** i **Missatges**.
+4. Sortirà un quadre amb els canvis («Pestanya creada…»). Al full hi veureu sis pestanyes: **Configuració**, **Participants**, **Activacions**, **Escenaris** (amb cinc escenaris d'exemple ja carregats, d'ESC-001 a ESC-005), **Converses** i **Missatges**.
 
 L'autorització només es fa una vegada. A partir d'ara, totes les opcions del menú funcionen directament.
 
@@ -199,7 +199,7 @@ Quan hi hagi una versió nova del programa:
 2. Al full, **Extensions** → **Apps Script**. Obriu `Replica.gs`, seleccioneu-ho tot (`Ctrl+A`) i enganxeu-hi el nou `dist/Replica.gs`. Si la versió nova canvia els permisos, feu el mateix amb `appsscript.json`. Deseu.
 3. Recarregueu el full i feu **Rèplica** → **Configuració** → **Prepara el full** i després **Comprova la configuració**. Si Google torna a demanar permisos, accepteu-los com al pas 3.8.
 
-Les propietats, el full de càlcul, la clau i la revisió automàtica es conserven: no cal tornar-los a configurar.
+Les propietats, el full de càlcul, la clau i la revisió automàtica es conserven: no cal tornar-los a configurar. **Prepara el full** afegeix els escenaris d'exemple nous que encara no tingueu, sense tocar els que ja hi són ([docs/escenaris.md](docs/escenaris.md#escenaris-nous-en-versions-noves-del-programa)).
 
 > ℹ️ **Per poder reobrir converses** cal la columna `max_torns_conversa` a la pestanya Converses. La crea **Prepara el full** (pas 3 d'aquí dalt). Si no la feu, l'opció **Reobre…** us ho recordarà.
 
@@ -228,7 +228,7 @@ La clau queda desada al compte de prova: no es veu a les Propietats de l'script,
 
 ### 4.2. Pestanya Participants
 
-Aquí hi ha **totes** les persones que poden participar. Només es pot enviar una simulació a qui és en aquesta llista, i la clienta només respon a qui hi té la casella **actiu** marcada.
+Aquí hi ha **totes** les persones que poden participar. Només es pot enviar una simulació a qui és en aquesta llista, i el client només respon a qui hi té la casella **actiu** marcada.
 
 | correu | actiu | notes |
 | --- | --- | --- |
@@ -236,7 +236,7 @@ Aquí hi ha **totes** les persones que poden participar. Només es pot enviar un
 | docent2@example.org | ☑ | Grup de dimarts |
 
 1. A la columna **correu**, escriviu una adreça per fila.
-2. A la columna **actiu**, marqueu la casella. Si la desmarqueu més endavant, aquella persona no podrà rebre simulacions noves i la clienta deixarà de respondre-li.
+2. A la columna **actiu**, marqueu la casella. Si la desmarqueu més endavant, aquella persona no podrà rebre simulacions noves i el client deixarà de respondre-li.
 3. La columna **notes** és lliure: el programa no la fa servir.
 
 > ❗ **No hi poseu l'adreça de la bústia de prova**: el programa ignoraria els correus o podria crear un bucle.
@@ -248,7 +248,7 @@ Cada fila és un paràmetre: la columna **valor** és la que podeu canviar (fent
 | Paràmetre (`clau`) | Què és | Valor inicial |
 | --- | --- | --- |
 | `interval_minuts` | Cada quants minuts es revisa la bústia: 1, 5, 10, 15 o 30. El canvi s'aplica sol a la propera revisió. | `5` |
-| `max_torns_per_defecte` | Màxim de respostes de la clienta per conversa (1 a 12), si l'escenari no n'indica cap | `6` |
+| `max_torns_per_defecte` | Màxim de respostes del client per conversa (1 a 12), si l'escenari no n'indica cap | `6` |
 | `correus_per_dia` | Quants correus pot enviar la bústia en 24 hores: **100** amb un compte de Gmail (el normal), **1500** amb un compte de Google Workspace. Vegeu la [secció 7](#7-límits-de-gmail-i-de-gemini). | `100` |
 
 ### 4.4. Comprovar la configuració
@@ -262,6 +262,12 @@ Cada fila és un paràmetre: la columna **valor** és la que podeu canviar (fent
 1. **Rèplica** → **Revisió automàtica** → **Crea o actualitza**. A partir d'ara, el programa revisarà la bústia amb l'interval de la pestanya Configuració (5 minuts, si no l'heu canviat).
 2. Mentre les simulacions estiguin aturades (`SIMULATION_ENABLED` = `false`), aquesta revisió no farà res: és l'**interruptor general**.
 
+### 4.6. Pestanya Escenaris
+
+Cada fila és una situació que podeu enviar: qui escriu el primer correu, què li ha passat, què vol aconseguir i com reacciona. N'hi ha cinc d'exemple (reclamacions, una factura errònia, una cancel·lació i una negociació). Podeu editar-los o afegir-ne de nous copiant una fila.
+
+Què fa cada columna, com escriure un escenari nou i com recuperar la versió nova d'un escenari d'exemple: [docs/escenaris.md](docs/escenaris.md).
+
 ## 5. Primera prova
 
 1. **Activeu les simulacions**: **Rèplica** → **Simulacions ATURADES · Activa-les…** → **Sí**. Feu-ho només quan el coordinador ho hagi confirmat.
@@ -269,9 +275,9 @@ Cada fila és un paràmetre: la columna **valor** és la que podeu canviar (fent
    - a **escenari**, trieu `ESC-001` de la llista;
    - a **destinataris**, escriviu l'adreça del participant (ha de ser a la pestanya Participants, marcada com a activa).
 3. Feu clic a qualsevol cel·la d'aquesta fila i trieu **Rèplica** → **Envia l'activació seleccionada…**. El quadre mostra l'escenari i a qui s'enviarà: si és correcte, feu clic a **Sí**.
-4. El participant rebrà un correu de **Marta Soler** amb l'assumpte *«Reclamació: comanda CO-2026-0418 incompleta»*. (Si no el veu, que miri a la carpeta de correu brossa.) La fila de l'activació mostra `ENVIADA` i el resultat.
+4. El participant rebrà un correu de **Marta Soler** amb l'assumpte *«Reclamació: comanda CO-0418 incompleta»*. (Si no el veu, que miri a la carpeta de correu brossa.) La fila de l'activació mostra `ENVIADA` i el resultat.
 5. El participant **respon** al correu com ho faria amb un client real.
-6. Al cap d'uns minuts (com a màxim, l'interval de la pestanya Configuració més el temps que trigui Gemini), rebrà la resposta de la clienta **dins del mateix fil**.
+6. Al cap d'uns minuts (com a màxim, l'interval de la pestanya Configuració més el temps que trigui Gemini), rebrà la resposta del client **dins del mateix fil**.
 7. Podeu seguir la conversa al full de càlcul, a les pestanyes **Converses** i **Missatges**.
 
 > 💡 Per no haver d'esperar durant una demostració: quan el participant hagi respost, feu **Rèplica** → **Revisa ara les respostes**. Fa el mateix que la revisió automàtica.
@@ -286,7 +292,7 @@ Tot es fa des del menú **Rèplica** del full de càlcul, havent entrat amb el *
 | **Revisa ara les respostes** | Mira la bústia ara mateix i respon el que estigui pendent, sense esperar la revisió automàtica. |
 | **Atura la conversa seleccionada…** | Tanca una conversa sense enviar cap comiat (passa a `FINALITZADA`). |
 | **Reactiva la conversa seleccionada…** | Torna a `ACTIVA` una conversa en `ERROR`, després de revisar-la. |
-| **Reobre la conversa seleccionada…** | Torna a obrir una conversa `FINALITZADA` i deixa que la clienta hi enviï unes quantes respostes més (2, si no dieu cap altre nombre). |
+| **Reobre la conversa seleccionada…** | Torna a obrir una conversa `FINALITZADA` i deixa que el client hi enviï unes quantes respostes més (2, si no dieu cap altre nombre). |
 | **Estat de les converses** | Resum: si les simulacions estan activades, cada quan es revisa la bústia i les converses obertes. |
 | **Simulacions ACTIVADES · Atura-les totes…** | **Interruptor general**: atura tot de seguida. No es respon ni s'envia res fins que es torni a activar. |
 | **Simulacions ATURADES · Activa-les…** | Torna a engegar-ho (només amb la confirmació del coordinador). |
@@ -314,7 +320,7 @@ Cada fila de la pestanya **Activacions** és un enviament del correu inicial.
 
 Què heu de saber:
 
-- **Tothom rep el mateix correu inicial** (l'assumpte i el text de l'escenari), però cadascú en el seu propi fil: ningú no veu les altres adreces. Després, cada conversa és diferent, perquè la clienta respon al que escriu cada persona.
+- **Tothom rep el mateix correu inicial** (l'assumpte i el text de l'escenari), però cadascú en el seu propi fil: ningú no veu les altres adreces. Després, cada conversa és diferent, perquè el client respon al que escriu cada persona.
 - **Si alguna adreça no és a la pestanya Participants** (o no hi està marcada com a activa), **no s'envia res** i el quadre diu quina és. Corregiu-la i torneu-ho a provar.
 - **Qui ja té una conversa oberta del mateix escenari no el torna a rebre.** El quadre i la columna resultat ho indiquen.
 - **Una fila `ENVIADA` no es pot tornar a enviar.** Per a una ronda nova, afegiu una fila nova.
@@ -327,13 +333,13 @@ Què heu de saber:
 2. Trieu **Rèplica** → **Atura la conversa seleccionada…** (o **Reactiva…**, o **Reobre…**).
 3. El quadre mostra la conversa triada (participant, estat, respostes i darrer error). Si és la correcta, feu clic a **Sí** (o **D'acord**).
 
-Abans de **reactivar** una conversa en `ERROR`, obriu el fil a la bústia de prova (Gmail) i comproveu que la darrera resposta de la clienta **no** s'ha enviat. Si sí que s'ha enviat, no la reactiveu: atureu-la, per no duplicar la resposta.
+Abans de **reactivar** una conversa en `ERROR`, obriu el fil a la bústia de prova (Gmail) i comproveu que la darrera resposta del client **no** s'ha enviat. Si sí que s'ha enviat, no la reactiveu: atureu-la, per no duplicar la resposta.
 
-**Reobrir** serveix per a les converses `FINALITZADA`: les que la clienta va donar per acabades, les que van arribar al màxim de respostes i les que vau aturar a mà.
+**Reobrir** serveix per a les converses `FINALITZADA`: les que el client va donar per acabades, les que van arribar al màxim de respostes i les que vau aturar a mà.
 
-- El quadre pregunta **quantes respostes més** pot enviar la clienta (d'1 a 6). Si el deixeu en blanc, són **2**. Es compten a partir de les que ja ha enviat: si en portava 3, amb 2 més en podrà enviar fins a 5.
-- Si el participant **va escriure mentre la conversa era tancada**, la clienta li respondrà a la propera revisió (o ara mateix, amb **Revisa ara les respostes**). Si va escriure més d'un correu, li respon tots junts en un de sol. Si no havia escrit res, la clienta espera el seu proper correu.
-- La clienta sap que havia acabat la conversa i la reprèn amb naturalitat. Si no hi ha res de nou a tractar, la pot tornar a tancar abans d'esgotar les respostes. Una conversa es pot reobrir tantes vegades com calgui.
+- El quadre pregunta **quantes respostes més** pot enviar el client (d'1 a 6). Si el deixeu en blanc, són **2**. Es compten a partir de les que ja ha enviat: si en portava 3, amb 2 més en podrà enviar fins a 5.
+- Si el participant **va escriure mentre la conversa era tancada**, el client li respondrà a la propera revisió (o ara mateix, amb **Revisa ara les respostes**). Si va escriure més d'un correu, li respon tots junts en un de sol. Si no havia escrit res, el client espera el seu proper correu.
+- El client sap que havia acabat la conversa i la reprèn amb naturalitat. Si no hi ha res de nou a tractar, la pot tornar a tancar abans d'esgotar les respostes. Una conversa es pot reobrir tantes vegades com calgui.
 - No es pot reobrir si el participant ja té **una altra conversa oberta del mateix escenari**: atureu-la primer.
 
 ### Treballar amb altres docents
@@ -357,7 +363,7 @@ Rèplica funciona amb serveis **gratuïts** de Google, i aquests serveis tenen l
 | Compte de Gmail normal (el recomanat per a la prova) | **unes 100** |
 | Compte de Google Workspace (per exemple, del centre) | **unes 1.500** |
 
-- Compten **tots** els correus de la clienta: cada correu inicial i cada resposta.
+- Compten **tots** els correus del client: cada correu inicial i cada resposta.
 - Cada conversa pot arribar a fer servir **1 + 6 correus** (l'inicial i fins a 6 respostes, amb el valor per defecte de `max_torns_per_defecte`).
 - **Compte ràpid**: amb un compte de Gmail i 6 respostes per conversa, no inicieu més de **14 converses en 24 hores** (14 × 7 = 98). Si en voleu més, reduïu `max_torns_per_defecte` o repartiu-les en dies diferents.
 - El programa porta el compte a partir del full (fila `correus_per_dia` de la pestanya Configuració):
@@ -367,7 +373,7 @@ Rèplica funciona amb serveis **gratuïts** de Google, i aquests serveis tenen l
 
 ### Gemini: nivell gratuït
 
-- **Límits de peticions.** El nivell gratuït permet un nombre limitat de peticions **per minut** i **per dia**. Cada resposta de la clienta és una petició. Els límits depenen del model i Google els canvia sovint: consulteu-los a Google AI Studio (pàgina de límits o *rate limits*) per al model que hàgiu triat.
+- **Límits de peticions.** El nivell gratuït permet un nombre limitat de peticions **per minut** i **per dia**. Cada resposta del client és una petició. Els límits depenen del model i Google els canvia sovint: consulteu-los a Google AI Studio (pàgina de límits o *rate limits*) per al model que hàgiu triat.
 - **Què passa si s'hi arriba.** La resposta no s'envia, a la columna `darrer_error` de la conversa surt `HTTP 429`, i el programa ho torna a provar sol a la revisió següent. Si passa sovint, espereu o feu servir menys participants a la vegada.
 - **Ús de les dades.** Amb el nivell gratuït, **Google pot fer servir el text que s'envia a Gemini per millorar els seus productes**, i el poden revisar persones. El programa treu les adreces de correu abans d'enviar el text, però el contingut dels missatges sí que s'envia. Per això:
   - Feu servir **només dades inventades**.
@@ -432,13 +438,13 @@ replica-poc/
 │   ├── PromptBuilder.js     Instruccions per a la IA
 │   ├── AiProvider.js        Abstracció del proveïdor (generaResposta)
 │   ├── GeminiProvider.js    Adaptador de Gemini (Interactions API)
-│   ├── EscenariInicial.js   Escenari ESC-001
+│   ├── Escenaris.js         FITXER GENERAT: escenaris d'exemple (de escenaris/*.json)
 │   └── Logger.js            Registres amb dades sensibles emmascarades
 ├── dist/Replica.gs          FITXER GENERAT: tot src/*.js en un sol fitxer (npm run build)
 ├── test/                    Proves amb dobles de Gmail, Sheets, Gemini i del menú
-├── exemples/escenari-001.json
-├── scripts/build.js         Genera dist/Replica.gs
-├── scripts/pre-commit.sh    Hook: no deixa fer commit de src/ amb dist/ desfasat
+├── escenaris/               Escenaris d'exemple, un JSON per escenari (ESC-NNN.json)
+├── scripts/build.js         Genera src/Escenaris.js i dist/Replica.gs
+├── scripts/pre-commit.sh    Hook: no deixa fer commit amb fitxers generats desfasats
 ├── scripts/clasp.sh         clasp dins de Docker
 ├── .github/workflows/       Proves automàtiques a GitHub a cada push
 └── docs/                    Instal·lació, operació i proves
@@ -447,16 +453,18 @@ replica-poc/
 Ordres (amb Node.js 22 o amb Docker, sense instal·lar res):
 
 ```sh
-# Després de canviar qualsevol fitxer de src/, regenereu el fitxer únic
+# Després de canviar qualsevol fitxer de src/ o de escenaris/, regenereu
+# src/Escenaris.js i el fitxer únic
 npm run build
 
 # Proves automàtiques (no envien correus ni criden Gemini).
-# Fallen si dist/Replica.gs no està al dia amb src/.
+# Fallen si src/Escenaris.js o dist/Replica.gs no estan al dia.
+# Comproven també cada escenari de escenaris/ (format, columnes, signatura).
 npm test
 docker run --rm --network none -u "$(id -u):$(id -g)" -v "$PWD":/app -w /app node:22-alpine sh -c "npm run build && npm test"
 
-# Una vegada per clon: hook que regenera dist/Replica.gs (amb Docker) i
-# atura el commit si src/ i dist/ no coincideixen
+# Una vegada per clon: hook que regenera els fitxers generats (amb Docker)
+# i atura el commit si no estan al dia
 ln -s ../../scripts/pre-commit.sh .git/hooks/pre-commit
 
 # Pujar el codi a Apps Script amb clasp 3.4.1
@@ -472,11 +480,12 @@ Documentació tècnica:
 
 - [docs/instal·lacio.md](docs/instal·lacio.md): projecte vinculat i independent, clasp, permisos OAuth, versió de l'API de Gemini, quotes i passos exactes.
 - [docs/operacio.md](docs/operacio.md): activacions, supervisar, recuperar, aturar i desinstal·lar.
+- [docs/escenaris.md](docs/escenaris.md): columnes, consells per escriure'n i com afegir-ne al repositori.
 - [docs/proves.md](docs/proves.md): proves d'acceptació, executades i pendents.
 
 ## 11. Estat del projecte i limitacions
 
-- ✅ Codi complet i **82 proves automàtiques** superades amb dobles de prova.
+- ✅ Codi complet i **107 proves automàtiques** superades amb dobles de prova.
 - ✅ **Verificat en real (19/11/2026)**: enviament del correu inicial, recepció, resposta del participant, generació amb Gemini i resposta automàtica dins del mateix fil (amb un sol participant i la instal·lació independent, des de l'editor).
 - ⏳ **Pendents de verificar en real**: el menú Rèplica i la instal·lació dins del full, les activacions amb diversos participants a la vegada, el límit diari de correus, execució doble, missatges consecutius, intents de revelar dades reservades, tancament de la conversa i límit de torns. Vegeu [docs/proves.md](docs/proves.md).
 - Pensat per a **pocs participants** a la vegada: vegeu els [límits de Gmail i de Gemini](#7-límits-de-gmail-i-de-gemini).

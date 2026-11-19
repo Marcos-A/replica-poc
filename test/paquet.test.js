@@ -3,8 +3,13 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
-const { genera, SORTIDA } = require('../scripts/build');
+const { genera, SORTIDA, generaEscenaris, SORTIDA_ESCENARIS } = require('../scripts/build');
 const { creaEntorn } = require('./entorn');
+
+test('src/Escenaris.js està al dia amb escenaris/ (si falla: npm run build)', () => {
+  assert.equal(fs.readFileSync(SORTIDA_ESCENARIS, 'utf8'), generaEscenaris(),
+    'src/Escenaris.js no coincideix amb escenaris/: executeu npm run build');
+});
 
 test('dist/Replica.gs està al dia amb src/ (si falla: npm run build)', () => {
   assert.ok(fs.existsSync(SORTIDA), 'Falta dist/Replica.gs: executeu npm run build');
@@ -23,11 +28,11 @@ test('dist/Replica.gs funciona sol: prepara, comprova, inicia i respon', () => {
 });
 
 test('Codi incomplet: comprovaConfiguracio diu quin fitxer falta, sense petar', () => {
-  const e = creaEntorn({ ometFitxers: ['GmailGateway.js', 'EscenariInicial.js'] });
+  const e = creaEntorn({ ometFitxers: ['GmailGateway.js', 'Escenaris.js'] });
   const r = e.g.comprovaConfiguracio(true);
   assert.equal(r.correcte, false);
   assert.match(r.text, /\[ERROR\] Codi: falta Bustia: .*src\/GmailGateway\.js al fitxer GmailGateway\.gs/);
-  assert.match(r.text, /\[ERROR\] Codi: falta ESCENARI_INICIAL/);
+  assert.match(r.text, /\[ERROR\] Codi: falta ESCENARIS: .*src\/Escenaris\.js/);
   assert.doesNotMatch(r.text, /falta Config/);
 });
 

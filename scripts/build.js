@@ -1,10 +1,12 @@
 #!/usr/bin/env node
 /**
- * Genera dist/Replica.gs: tot el codi de src/*.js en un sol fitxer, per a la
- * instal·lació copiant i enganxant a l'editor d'Apps Script.
+ * Genera, per ordre:
+ * 1. src/Escenaris.js, a partir dels fitxers escenaris/*.json (un per escenari).
+ * 2. dist/Replica.gs: tot el codi de src/*.js en un sol fitxer, per a la
+ *    instal·lació copiant i enganxant a l'editor d'Apps Script.
  *
- * src/ és l'única font: no editeu mai dist/Replica.gs a mà.
- * npm test comprova que dist/Replica.gs està al dia.
+ * Les fonts són escenaris/ i src/: no editeu mai a mà src/Escenaris.js ni
+ * dist/Replica.gs. npm test comprova que tots dos estan al dia.
  *
  *   node scripts/build.js
  */
@@ -15,6 +17,29 @@ const path = require('node:path');
 const ARREL = path.join(__dirname, '..');
 const DIR_SRC = path.join(ARREL, 'src');
 const SORTIDA = path.join(ARREL, 'dist', 'Replica.gs');
+const DIR_ESCENARIS = path.join(ARREL, 'escenaris');
+const SORTIDA_ESCENARIS = path.join(DIR_SRC, 'Escenaris.js');
+
+/** Escenaris de escenaris/*.json, ordenats pel nom del fitxer. */
+function llegeixEscenaris() {
+  return fs.readdirSync(DIR_ESCENARIS).filter((f) => f.endsWith('.json')).sort()
+    .map((f) => ({ fitxer: f, escenari: JSON.parse(fs.readFileSync(path.join(DIR_ESCENARIS, f), 'utf8')) }));
+}
+
+function generaEscenaris() {
+  const escenaris = llegeixEscenaris().map((e) => e.escenari);
+  return [
+    '/**',
+    ' * FITXER GENERAT a partir de escenaris/*.json: no l\'editeu. Per afegir o',
+    ' * canviar un escenari, editeu escenaris/ i executeu "npm run build".',
+    ' *',
+    ' * preparaFulls() afegeix a la pestanya Escenaris els que encara no hi són',
+    ' * (per id). No modifica mai les files que ja hi ha. Dades inventades.',
+    ' */',
+    'var ESCENARIS = ' + JSON.stringify(escenaris, null, 2) + ';',
+    ''
+  ].join('\n');
+}
 
 function genera() {
   const versio = JSON.parse(fs.readFileSync(path.join(ARREL, 'package.json'), 'utf8')).version;
@@ -41,9 +66,11 @@ function genera() {
   return capcalera + '\n' + cos + final;
 }
 
-module.exports = { genera, SORTIDA };
+module.exports = { genera, SORTIDA, generaEscenaris, SORTIDA_ESCENARIS, llegeixEscenaris };
 
 if (require.main === module) {
+  fs.writeFileSync(SORTIDA_ESCENARIS, generaEscenaris());
+  console.log('Generat ' + path.relative(ARREL, SORTIDA_ESCENARIS));
   fs.mkdirSync(path.dirname(SORTIDA), { recursive: true });
   fs.writeFileSync(SORTIDA, genera());
   console.log('Generat ' + path.relative(ARREL, SORTIDA));

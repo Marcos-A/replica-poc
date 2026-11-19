@@ -169,7 +169,7 @@ var Repositori = (function () {
    * Crea les pestanyes i capçaleres que falten, sense esborrar res.
    * Retorna un informe de canvis.
    */
-  function preparaFulls(escenariInicial) {
+  function preparaFulls(escenarisInicials) {
     var llibre = llibre_();
     var canvis = [];
     var creades = {};
@@ -193,10 +193,14 @@ var Repositori = (function () {
       full.setFrozenRows(1);
     });
 
-    if (escenariInicial && !escenari(escenariInicial.id)) {
-      afegeix_(FULLS.ESCENARIS, escenariInicial);
-      canvis.push('Escenari afegit: ' + escenariInicial.id);
-    }
+    // Només s'afegeixen els que falten: les files existents (potser editades
+    // al full) no es toquen mai.
+    (escenarisInicials || []).forEach(function (e) {
+      if (!escenari(e.id)) {
+        afegeix_(FULLS.ESCENARIS, e);
+        canvis.push('Escenari afegit: ' + e.id);
+      }
+    });
     preparaParametres_(llibre, canvis);
     if (creades[FULLS.PARTICIPANTS]) migraRemitents_(canvis);
     preparaValidacions_(llibre);
