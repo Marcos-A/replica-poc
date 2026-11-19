@@ -134,6 +134,11 @@ var Simulacio = (function () {
     var inici = Date.now();
     var resum = { estat: 'OK', revisades: 0, respostes: 0, errors: 0, ajornades: 0 };
     try {
+      try {
+        Disparador.sincronitza();
+      } catch (e) {
+        Registre.avis('No s\'ha pogut actualitzar l\'interval del disparador', { error: Registre.resumError(e) });
+      }
       var converses = Repositori.converses([E_().ACTIVA, E_().PROCESSANT]);
       if (converses.length === 0) return resum;
       var propies = Bustia.adrecesPropies();

@@ -35,19 +35,13 @@ function comprovaConfiguracio(ometGemini) {
     afegeix('ALLOWED_SENDERS', invalids.length ? 'ERROR' : 'OK',
       invalids.length ? invalids.length + ' adreça(es) no vàlida(es)' : remitents.length + ' adreça(es) autoritzada(es)');
   }
-  var provaParticipant = Config.analitzaRemitents(Config.propietat(Config.PROPIETATS.PROVA_PARTICIPANT));
-  if (provaParticipant.length === 0) {
-    afegeix('PROVA_PARTICIPANT', 'AVÍS', 'no definida: cal per iniciar simulacions amb provaIniciaSimulacio()');
-  } else if (provaParticipant.length > 1) {
-    afegeix('PROVA_PARTICIPANT', 'ERROR', 'conté ' + provaParticipant.length + ' adreces; ha de contenir una sola adreça (la llista completa va a ALLOWED_SENDERS)');
-  } else if (!Config.esCorreuValid(provaParticipant[0])) {
-    afegeix('PROVA_PARTICIPANT', 'ERROR', 'l\'adreça no és vàlida');
-  } else if (remitents.indexOf(provaParticipant[0]) === -1) {
-    afegeix('PROVA_PARTICIPANT', 'ERROR', Registre.emmascaraCorreu(provaParticipant[0]) + ' no és a ALLOWED_SENDERS: afegeix-la-hi');
-  } else {
-    afegeix('PROVA_PARTICIPANT', 'OK', Registre.emmascaraCorreu(provaParticipant[0]) + ' (també és a ALLOWED_SENDERS)');
-  }
   afegeix('Interruptor global', 'INFO', conf.simulacioActivada ? 'SIMULATION_ENABLED=true (processament actiu)' : 'SIMULATION_ENABLED=false (no es processa ni s\'envia res)');
+
+  [Config.PROPIETATS.PROVA_PARTICIPANT, Config.PROPIETATS.PROVA_ESCENARI].forEach(function (nom) {
+    if (Config.propietat(nom)) {
+      afegeix('Propietat ' + nom, 'AVÍS', 'ja no s\'utilitza (ara és a la pestanya Configuració): podeu esborrar-la');
+    }
+  });
 
   if (conf.spreadsheetId) {
     try {
@@ -60,6 +54,7 @@ function comprovaConfiguracio(ometGemini) {
           afegeix('Pestanya ' + d.pestanya, 'OK', 'correcta');
         }
       });
+      diagnosticaParametres_(remitents).forEach(function (d) { afegeix(d[0], d[1], d[2]); });
     } catch (e) {
       afegeix('Google Sheets', 'ERROR', 'no s\'hi pot accedir: ' + Registre.resumError(e));
     }
@@ -84,12 +79,12 @@ function comprovaConfiguracio(ometGemini) {
     }
   }
 
-  var disparadors = ScriptApp.getProjectTriggers().filter(function (t) {
-    return t.getHandlerFunction() === 'processaCorreusPendents';
-  }).length;
+  var disparadors = Disparador.compta();
+  var aplicat = Disparador.intervalAplicat();
   afegeix('Disparador', disparadors === 1 ? 'OK' : (disparadors === 0 ? 'AVÍS' : 'ERROR'),
     disparadors === 0 ? 'no n\'hi ha cap: executa creaDisparador()' :
-      disparadors + ' disparador(s) de processaCorreusPendents' + (disparadors > 1 ? ': elimina\'n els sobrants amb eliminaDisparadors()' : ''));
+      disparadors > 1 ? disparadors + ' disparadors: executa creaDisparador() perquè en quedi un de sol' :
+        'revisió cada ' + (aplicat || '?') + ' minut(s)');
 
   var correcte = diagnostics.every(function (d) { return d.estat !== 'ERROR'; });
   var text = diagnostics.map(function (d) {
@@ -97,6 +92,39 @@ function comprovaConfiguracio(ometGemini) {
   }).join('\n');
   Registre.info((correcte ? 'Configuració correcta' : 'Configuració incompleta') + '\n' + text);
   return { correcte: correcte, diagnostics: diagnostics, text: text };
+}
+
+/** Diagnòstic de la pestanya Configuració: llista de [element, estat, detall]. */
+function diagnosticaParametres_(remitents) {
+  var resultat = [];
+  var conf = Repositori.configuracio();
+  conf.errors.forEach(function (e) {
+    resultat.push(['Configuració › ' + e.clau, 'ERROR', e.missatge]);
+  });
+  var v = conf.valors;
+  if (!conf.errors.some(function (e) { return e.clau === 'Configuració'; })) {
+    resultat.push(['Configuració › interval_minuts', 'INFO', v.intervalMinuts + ' minut(s)' +
+      (Disparador.compta() > 0 && Disparador.intervalAplicat() !== v.intervalMinuts
+        ? ' (s\'aplicarà a la propera revisió automàtica, o ara mateix si executeu creaDisparador)' : '')]);
+    var escenari = Repositori.escenari(v.escenari);
+    resultat.push(['Configuració › escenari', escenari && escenari.actiu ? 'OK' : 'ERROR',
+      !escenari ? v.escenari + ' no existeix a la pestanya Escenaris' :
+        !escenari.actiu ? v.escenari + ' no està actiu (columna actiu)' : v.escenari + ' (' + escenari.titol + ')']);
+    var p = v.participants;
+    if (p.length === 0) {
+      resultat.push(['Configuració › participant', 'AVÍS', 'buit: cal per iniciar simulacions amb provaIniciaSimulacio()']);
+    } else if (p.length > 1) {
+      resultat.push(['Configuració › participant', 'ERROR', 'conté ' + p.length + ' adreces; ha de contenir una sola adreça (la llista completa va a ALLOWED_SENDERS)']);
+    } else if (!Config.esCorreuValid(p[0])) {
+      resultat.push(['Configuració › participant', 'ERROR', 'l\'adreça no és vàlida']);
+    } else if (remitents.indexOf(p[0]) === -1) {
+      resultat.push(['Configuració › participant', 'ERROR', Registre.emmascaraCorreu(p[0]) + ' no és a ALLOWED_SENDERS: afegiu-la-hi']);
+    } else {
+      resultat.push(['Configuració › participant', 'OK', Registre.emmascaraCorreu(p[0]) + ' (també és a ALLOWED_SENDERS)']);
+    }
+    resultat.push(['Configuració › max_torns_per_defecte', 'INFO', v.maxTornsPerDefecte + ' respostes']);
+  }
+  return resultat;
 }
 
 /** Inicia una simulació: envia el missatge inicial al participant. */
@@ -108,21 +136,20 @@ function iniciaSimulacio(correuParticipant, idEscenari) {
 }
 
 /**
- * Funció auxiliar per a l'editor: llegeix el participant de la propietat
- * PROVA_PARTICIPANT (i, opcionalment, l'escenari de PROVA_ESCENARI).
- * Així no cal escriure cap adreça real al codi.
+ * Funció per a l'editor: inicia una simulació amb el participant i
+ * l'escenari indicats a la pestanya Configuració. Així no cal escriure
+ * cap adreça real al codi.
  */
 function provaIniciaSimulacio() {
-  var correu = Config.propietat(Config.PROPIETATS.PROVA_PARTICIPANT);
-  if (!correu) {
-    throw new Error('Defineix la propietat PROVA_PARTICIPANT amb l\'adreça del docent participant.');
+  var v = Repositori.configuracio().valors;
+  if (v.participants.length === 0) {
+    throw new Error('Escriviu l\'adreça del docent participant a la pestanya Configuració (fila participant).');
   }
-  if (Config.analitzaRemitents(correu).length > 1) {
-    throw new Error('PROVA_PARTICIPANT ha de contenir una sola adreça (la del docent amb qui inicies ' +
-      'aquesta simulació). La llista de tots els participants va a ALLOWED_SENDERS.');
+  if (v.participants.length > 1) {
+    throw new Error('La fila participant de la pestanya Configuració ha de contenir una sola adreça (la del ' +
+      'docent amb qui inicieu aquesta simulació). La llista de tots els participants va a ALLOWED_SENDERS.');
   }
-  var escenari = Config.propietat(Config.PROPIETATS.PROVA_ESCENARI) || 'ESC-001';
-  var resultat = iniciaSimulacio(correu, escenari);
+  var resultat = iniciaSimulacio(v.participants[0], v.escenari);
   Registre.info('Conversa creada', resultat);
   return resultat;
 }
@@ -153,29 +180,77 @@ function generaResposta(context) {
   return ProveidorIA.genera(context);
 }
 
-/** Crea el disparador temporal (un de sol). minuts: 1, 5, 10, 15 o 30. */
+/**
+ * Crea el disparador temporal (un de sol) amb l'interval de la pestanya
+ * Configuració. Si es passa `minuts` (1, 5, 10, 15 o 30), també el desa a
+ * la pestanya, perquè la revisió automàtica no el desfaci.
+ */
 function creaDisparador(minuts) {
-  var interval = Number(minuts) || Config.LIMITS.INTERVAL_DISPARADOR_MINUTS;
-  if ([1, 5, 10, 15, 30].indexOf(interval) === -1) {
-    throw new Error('Interval no vàlid: ' + interval + '. Valors permesos: 1, 5, 10, 15 o 30 minuts.');
+  var interval;
+  if (minuts !== undefined && minuts !== null && minuts !== '') {
+    interval = Number(minuts);
+    if (Config.LIMITS.INTERVALS_PERMESOS.indexOf(interval) === -1) {
+      throw new Error('Interval no vàlid: ' + minuts + '. Valors permesos: 1, 5, 10, 15 o 30 minuts.');
+    }
+    Repositori.estableixConfiguracio('interval_minuts', interval);
+  } else {
+    interval = Repositori.configuracio().valors.intervalMinuts;
   }
-  eliminaDisparadors();
-  ScriptApp.newTrigger('processaCorreusPendents').timeBased().everyMinutes(interval).create();
+  Disparador.crea(interval);
   Registre.info('Disparador creat: processaCorreusPendents cada ' + interval + ' minut(s).');
 }
 
 /** Elimina els disparadors de processaCorreusPendents. */
 function eliminaDisparadors() {
-  var eliminats = 0;
-  ScriptApp.getProjectTriggers().forEach(function (t) {
-    if (t.getHandlerFunction() === 'processaCorreusPendents') {
-      ScriptApp.deleteTrigger(t);
-      eliminats++;
-    }
-  });
+  var eliminats = Disparador.elimina();
   Registre.info('Disparadors eliminats: ' + eliminats);
   return eliminats;
 }
+
+/**
+ * Gestió del disparador temporal. Apps Script no permet llegir l'interval
+ * d'un disparador existent, per això es desa a la propietat INTERVAL_APLICAT.
+ */
+var Disparador = (function () {
+  var FUNCIO = 'processaCorreusPendents';
+
+  function propis_() {
+    return ScriptApp.getProjectTriggers().filter(function (t) { return t.getHandlerFunction() === FUNCIO; });
+  }
+
+  function compta() { return propis_().length; }
+
+  function elimina() {
+    var llista = propis_();
+    llista.forEach(function (t) { ScriptApp.deleteTrigger(t); });
+    return llista.length;
+  }
+
+  function crea(interval) {
+    elimina();
+    ScriptApp.newTrigger(FUNCIO).timeBased().everyMinutes(interval).create();
+    Config.estableixPropietat(Config.PROPIETATS.INTERVAL_APLICAT, interval);
+  }
+
+  function intervalAplicat() {
+    return Number(Config.propietat(Config.PROPIETATS.INTERVAL_APLICAT)) || null;
+  }
+
+  /**
+   * Si l'interval de la pestanya Configuració ha canviat, recrea el
+   * disparador. No en crea cap si s'han eliminat expressament.
+   */
+  function sincronitza() {
+    if (compta() === 0) return false;
+    var desitjat = Repositori.configuracio().valors.intervalMinuts;
+    if (intervalAplicat() === desitjat && compta() === 1) return false;
+    crea(desitjat);
+    Registre.info('Interval de revisió actualitzat a ' + desitjat + ' minut(s).');
+    return true;
+  }
+
+  return { compta: compta, elimina: elimina, crea: crea, intervalAplicat: intervalAplicat, sincronitza: sincronitza };
+})();
 
 /** Torna a ACTIVA una conversa en ERROR (després de revisar-la). */
 function reactivaConversa(idConversa) {

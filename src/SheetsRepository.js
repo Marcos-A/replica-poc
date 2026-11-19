@@ -1,17 +1,23 @@
 /**
- * Accés a Google Sheets: tres pestanyes amb capçalera a la fila 1.
+ * Accés a Google Sheets: quatre pestanyes amb capçalera a la fila 1.
+ *
+ * Configuració conté els paràmetres operatius que el docent pot canviar
+ * sense tocar codi. Els secrets i els controls de seguretat (clau, model,
+ * remitents autoritzats, interruptor) continuen a Script Properties.
  *
  * Les pestanyes Converses i Missatges tenen format de text pla (@) perquè
  * Sheets no converteixi dates ISO ni identificadors de Gmail en números.
  */
 var Repositori = (function () {
   var FULLS = {
+    CONFIGURACIO: 'Configuració',
     ESCENARIS: 'Escenaris',
     CONVERSES: 'Converses',
     MISSATGES: 'Missatges'
   };
 
   var COLUMNES = {
+    'Configuració': ['clau', 'valor', 'descripcio'],
     Escenaris: [
       'id', 'actiu', 'titol', 'interlocutor', 'empresa', 'caracter', 'incidencia',
       'objectiu_interlocutor', 'limits_reservats', 'objectiu_participant', 'criteris',
@@ -47,6 +53,33 @@ var Repositori = (function () {
   };
 
   var ROLS = { PARTICIPANT: 'participant', INTERLOCUTOR: 'interlocutor' };
+
+  /** Paràmetres de la pestanya Configuració, amb valor inicial i explicació. */
+  var PARAMETRES = [
+    {
+      clau: 'interval_minuts',
+      valor: 5,
+      descripcio: 'Cada quants minuts es revisa la bústia: 1, 5, 10, 15 o 30. El canvi s\'aplica sol a la ' +
+        'propera revisió. Amb 1 minut, feu-lo servir només durant les proves: consumeix molta quota diària.'
+    },
+    {
+      clau: 'escenari',
+      valor: 'ESC-001',
+      descripcio: 'Escenari (columna id de la pestanya Escenaris) que s\'utilitza en executar provaIniciaSimulacio.'
+    },
+    {
+      clau: 'participant',
+      valor: '',
+      descripcio: 'UNA SOLA adreça: el docent amb qui iniciareu la propera simulació en executar ' +
+        'provaIniciaSimulacio. Ha de ser també a ALLOWED_SENDERS (Propietats de l\'script).'
+    },
+    {
+      clau: 'max_torns_per_defecte',
+      valor: 6,
+      descripcio: 'Nombre màxim de respostes de la IA per conversa (de 1 a 12) quan l\'escenari no ' +
+        'n\'indica cap a la columna max_torns.'
+    }
+  ];
 
   var llibreEnMemoria_ = null;
 
@@ -110,11 +143,107 @@ var Repositori = (function () {
       afegeix_(FULLS.ESCENARIS, escenariInicial);
       canvis.push('Escenari afegit: ' + escenariInicial.id);
     }
+    preparaParametres_(llibre, canvis);
     eliminaFullsBuitsPerDefecte_(llibre).forEach(function (nom) {
       canvis.push('Pestanya buida eliminada: ' + nom);
     });
     SpreadsheetApp.flush();
     return canvis;
+  }
+
+  /**
+   * Afegeix els paràmetres que falten a Configuració (sense canviar els
+   * valors existents) i hi aplica les llistes desplegables.
+   */
+  function preparaParametres_(llibre, canvis) {
+    var existents = {};
+    llegeixTaula_(FULLS.CONFIGURACIO).files.forEach(function (f) {
+      existents[String(f.dades.clau).trim()] = true;
+    });
+    // Migració: les propietats antigues PROVA_* passen a la pestanya.
+    var antigues = {
+      participant: Config.propietat(Config.PROPIETATS.PROVA_PARTICIPANT),
+      escenari: Config.propietat(Config.PROPIETATS.PROVA_ESCENARI)
+    };
+    PARAMETRES.forEach(function (p) {
+      if (existents[p.clau]) return;
+      var valor = antigues[p.clau] || p.valor;
+      afegeix_(FULLS.CONFIGURACIO, { clau: p.clau, valor: valor, descripcio: p.descripcio });
+      canvis.push('Paràmetre afegit a Configuració: ' + p.clau +
+        (antigues[p.clau] ? ' (copiat de la propietat ' + (p.clau === 'participant' ? 'PROVA_PARTICIPANT' : 'PROVA_ESCENARI') + ')' : ''));
+    });
+
+    var full = llibre.getSheetByName(FULLS.CONFIGURACIO);
+    var escenaris = llibre.getSheetByName(FULLS.ESCENARIS);
+    llegeixTaula_(FULLS.CONFIGURACIO).files.forEach(function (f) {
+      var cella = full.getRange(f.fila, 2);
+      var clau = String(f.dades.clau).trim();
+      var regla = null;
+      if (clau === 'interval_minuts') {
+        regla = SpreadsheetApp.newDataValidation()
+          .requireValueInList(Config.LIMITS.INTERVALS_PERMESOS.map(String), true)
+          .setAllowInvalid(false).setHelpText('Trieu 1, 5, 10, 15 o 30 minuts.').build();
+      } else if (clau === 'escenari') {
+        regla = SpreadsheetApp.newDataValidation()
+          .requireValueInRange(escenaris.getRange('A2:A'), true)
+          .setAllowInvalid(false).setHelpText('Trieu un id de la pestanya Escenaris.').build();
+      } else if (clau === 'max_torns_per_defecte') {
+        regla = SpreadsheetApp.newDataValidation()
+          .requireNumberBetween(1, Config.LIMITS.MAX_TORNS_ABSOLUT)
+          .setAllowInvalid(false).setHelpText('Un nombre entre 1 i ' + Config.LIMITS.MAX_TORNS_ABSOLUT + '.').build();
+      }
+      if (regla) cella.setDataValidation(regla);
+    });
+  }
+
+  /**
+   * Llegeix la pestanya Configuració. Retorna els valors normalitzats
+   * (amb valors per defecte si una cel·la és buida o incorrecta) i la
+   * llista de problemes trobats.
+   */
+  function configuracio() {
+    var errors = [];
+    var crus = {};
+    var llibre = llibre_();
+    if (!llibre.getSheetByName(FULLS.CONFIGURACIO)) {
+      errors.push({ clau: 'Configuració', missatge: 'la pestanya no existeix: executa preparaFulls()' });
+    } else {
+      llegeixTaula_(FULLS.CONFIGURACIO).files.forEach(function (f) {
+        crus[String(f.dades.clau).trim()] = f.dades.valor;
+      });
+    }
+    function text(clau) { return String(crus[clau] === undefined || crus[clau] === null ? '' : crus[clau]).trim(); }
+
+    var interval = Number(text('interval_minuts'));
+    if (text('interval_minuts') === '') {
+      interval = Config.LIMITS.INTERVAL_DISPARADOR_MINUTS;
+    } else if (Config.LIMITS.INTERVALS_PERMESOS.indexOf(interval) === -1) {
+      errors.push({ clau: 'interval_minuts', missatge: '"' + text('interval_minuts') + '" no és vàlid; ha de ser 1, 5, 10, 15 o 30' });
+      interval = Config.LIMITS.INTERVAL_DISPARADOR_MINUTS;
+    }
+
+    var maxTorns = Number(text('max_torns_per_defecte'));
+    if (text('max_torns_per_defecte') === '') {
+      maxTorns = Config.LIMITS.MAX_TORNS_PER_DEFECTE;
+    } else if (!(maxTorns >= 1 && maxTorns <= Config.LIMITS.MAX_TORNS_ABSOLUT && Math.floor(maxTorns) === maxTorns)) {
+      errors.push({ clau: 'max_torns_per_defecte', missatge: 'ha de ser un nombre enter entre 1 i ' + Config.LIMITS.MAX_TORNS_ABSOLUT });
+      maxTorns = Config.LIMITS.MAX_TORNS_PER_DEFECTE;
+    }
+
+    return {
+      valors: {
+        intervalMinuts: interval,
+        escenari: text('escenari') || 'ESC-001',
+        participants: Config.analitzaRemitents(text('participant')),
+        maxTornsPerDefecte: maxTorns
+      },
+      errors: errors
+    };
+  }
+
+  /** Canvia el valor d'un paràmetre de Configuració. */
+  function estableixConfiguracio(clau, valor) {
+    actualitza_(FULLS.CONFIGURACIO, 'clau', clau, { valor: valor });
   }
 
   /**
@@ -191,7 +320,7 @@ var Repositori = (function () {
     COLUMNES.Escenaris.forEach(function (c) { e[c] = d[c]; });
     e.id = String(d.id).trim();
     e.actiu = d.actiu === true || String(d.actiu).trim().toUpperCase() === 'TRUE';
-    e.max_torns = Number(d.max_torns) || Config.LIMITS.MAX_TORNS_PER_DEFECTE;
+    e.max_torns = Number(d.max_torns) || configuracio().valors.maxTornsPerDefecte;
     e.max_torns = Math.min(Math.max(1, Math.floor(e.max_torns)), Config.LIMITS.MAX_TORNS_ABSOLUT);
     COLUMNES.Escenaris.forEach(function (c) {
       if (typeof e[c] === 'string') e[c] = e[c].trim();
@@ -302,6 +431,8 @@ var Repositori = (function () {
     ESTATS_MISSATGE: ESTATS_MISSATGE,
     ROLS: ROLS,
     preparaFulls: preparaFulls,
+    configuracio: configuracio,
+    estableixConfiguracio: estableixConfiguracio,
     escenari: escenari,
     converses: converses,
     conversa: conversa,

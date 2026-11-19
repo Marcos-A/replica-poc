@@ -14,7 +14,7 @@ La guia pas a pas per a persones sense experiència tècnica és al [README](../
 | 6 | Script Properties | **Persona** | Configuració del projecte → Propietats de l'script |
 | 7 | Autoritzar OAuth i preparar el full | **Persona** | Executar `preparaFulls` des de l'editor |
 | 8 | Diagnòstic | Persona | Executar `comprovaConfiguracio` |
-| 9 | Disparador | Persona | Executar `creaDisparador` (o `creaDisparador(1)` per a demostracions) |
+| 9 | Paràmetres i disparador | Persona | Omplir la pestanya `Configuració` del full i executar `creaDisparador` |
 | 10 | Prova real amb dos docents | Persona | Vegeu [operacio.md](operacio.md) i [proves.md](proves.md) |
 | 11 | Deixar `SIMULATION_ENABLED=false` | Persona | Fins que el coordinador confirmi l'activació |
 
@@ -98,8 +98,23 @@ El projecte no és verificat per Google; en autoritzar, cal passar per **Configu
 | `SPREADSHEET_ID` | Sí | Identificador del full de càlcul |
 | `ALLOWED_SENDERS` | Sí | Adreces separades per comes, punts i coma o espais |
 | `SIMULATION_ENABLED` | Sí | `true` o `false`. Qualsevol altre valor equival a `false`. |
-| `PROVA_PARTICIPANT` | Per iniciar des de l'editor | **Una sola** adreça (la que fa servir `provaIniciaSimulacio()`); també ha de ser a `ALLOWED_SENDERS`. `comprovaConfiguracio()` ho verifica. |
-| `PROVA_ESCENARI` | No | Escenari de `provaIniciaSimulacio()` (per defecte `ESC-001`) |
+| `INTERVAL_APLICAT` | Interna | La desa el programa: interval amb què es va crear el disparador. No cal tocar-la. |
+| `PROVA_PARTICIPANT`, `PROVA_ESCENARI` | Obsoletes | Ara són a la pestanya `Configuració`. `preparaFulls()` en copia el valor i `comprovaConfiguracio()` avisa que es poden esborrar. |
+
+## Pestanya Configuració
+
+Paràmetres operatius que el docent pot canviar des del full de càlcul, sense tocar codi. `preparaFulls()` crea la pestanya amb una fila per paràmetre (`clau`, `valor`, `descripcio`), afegeix els que falten sense canviar els valors existents i hi aplica llistes desplegables.
+
+| `clau` | Valors | Ús |
+| --- | --- | --- |
+| `interval_minuts` | 1, 5, 10, 15 o 30 (per defecte 5) | Interval del disparador. Cada execució de `processaCorreusPendents` el compara amb `INTERVAL_APLICAT` i, si ha canviat, recrea el disparador. Si s'han eliminat els disparadors expressament, no en crea cap. `creaDisparador(n)` també el desa a la pestanya. |
+| `escenari` | Un `id` de la pestanya Escenaris (per defecte `ESC-001`) | Escenari de `provaIniciaSimulacio()` |
+| `participant` | **Una sola** adreça, que ha de ser a `ALLOWED_SENDERS` | Destinatari de `provaIniciaSimulacio()` |
+| `max_torns_per_defecte` | Enter de 1 a 12 (per defecte 6) | Límit de torns quan la columna `max_torns` de l'escenari és buida |
+
+Un valor incorrecte no atura el sistema: s'utilitza el valor per defecte i `comprovaConfiguracio()` mostra un `[ERROR]` amb el motiu.
+
+Els secrets i els controls de seguretat (`GEMINI_API_KEY`, `GEMINI_MODEL`, `SPREADSHEET_ID`, `ALLOWED_SENDERS`, `SIMULATION_ENABLED`) **no** són a la pestanya: qui pugui editar el full no pot activar el sistema ni autoritzar participants nous.
 
 La clau només es llegeix a `Config.clauApi()` i s'envia a Gemini per la capçalera `x-goog-api-key`, mai a l'URL. Els registres emmascaren qualsevol cadena amb format de clau (`AIza…`) i les adreces de correu.
 
@@ -120,6 +135,6 @@ Si Google canvia la revisió de l'API, s'ha d'actualitzar `API_REVISION` i, si c
 
 ## Quotes d'Apps Script
 
-Amb un compte gratuït de Gmail, el temps total d'execució de disparadors és limitat (de l'ordre de 90 minuts diaris). Una execució sense converses actives dura uns segons; amb el disparador cada 5 minuts (288 execucions al dia) hi ha marge. Amb `creaDisparador(1)` (1.440 execucions diàries) feu-lo servir només durant demostracions i torneu a `creaDisparador(5)` després.
+Amb un compte gratuït de Gmail, el temps total d'execució de disparadors és limitat (de l'ordre de 90 minuts diaris). Una execució sense converses actives dura uns segons; amb el disparador cada 5 minuts (288 execucions al dia) hi ha marge. Amb `interval_minuts` a 1 (1.440 execucions diàries), feu-lo servir només durant demostracions i torneu a 5 després.
 
 Límits interns (a `src/Config.js`): 10 converses per execució, 4 minuts per execució, màxim 6 torns per escenari (topall absolut de 12), 4.000 caràcters per missatge entrant, 20.000 caràcters d'historial i 2.500 caràcters per resposta.

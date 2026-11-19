@@ -33,17 +33,17 @@ Llegenda: ✅ superada · ⏳ pendent · — no aplicable
 | Interruptor global desactivat | Cap processament ni enviament | ✅ | ⏳ |
 | Dades reservades | No apareixen al correu inicial ni es revelen per petició directa | ✅ (correu inicial i prompt) | ⏳ (resposta real de Gemini) |
 
-Proves automàtiques addicionals: error clar si PROVA_PARTICIPANT conté diverses adreces i diagnòstic de PROVA_PARTICIPANT a comprovaConfiguracio, eliminació de la pestanya per defecte només si és buida, execució simultània amb el bloqueig ocupat, respostes automàtiques («fora de l'oficina») i notificacions de no lliurament, sortida buida o no JSON de Gemini, enviament interromput (abans i després d'enviar) i reconciliació, enviament inicial interromput i reconciliació amb Enviats, coherència entre `exemples/escenari-001.json` i l'escenari carregat, absència de la clau i d'adreces completes als registres, i funcions pures (neteja de cites i signatures, detecció d'automatismes, interpretació de la resposta de Gemini).
+Proves automàtiques addicionals: pestanya Configuració (creació idempotent sense sobreescriure valors, desplegables, migració de PROVA_PARTICIPANT/PROVA_ESCENARI, valors incorrectes amb error llegible i valor per defecte, participant amb diverses adreces o fora d'ALLOWED_SENDERS, max_torns per defecte), canvi d'interval aplicat automàticament al disparador, eliminació de la pestanya per defecte només si és buida, execució simultània amb el bloqueig ocupat, respostes automàtiques («fora de l'oficina») i notificacions de no lliurament, sortida buida o no JSON de Gemini, enviament interromput (abans i després d'enviar) i reconciliació, enviament inicial interromput i reconciliació amb Enviats, coherència entre `exemples/escenari-001.json` i l'escenari carregat, absència de la clau i d'adreces completes als registres, i funcions pures (neteja de cites i signatures, detecció d'automatismes, interpretació de la resposta de Gemini).
 
 ### Resultat observat
 
-19/11/2026, Node.js 22.23.4 (contenidor `node:22-alpine`): **40 proves, 40 superades, 0 fallades.**
+19/11/2026, Node.js 22.23.4 (contenidor `node:22-alpine`): **46 proves, 46 superades, 0 fallades.**
 
 ## Prova manual d'integració (pendent)
 
 Cap prova real s'ha executat encara: requereix el compte de prova, l'autorització OAuth i la clau de Gemini, que han de configurar persones. **No es pot declarar el prototip funcional fins que els passos 1–6 siguin ✅.**
 
-Preparació: instal·lació completa ([README](../README.md)), `comprovaConfiguracio` sense errors, `creaDisparador(1)` per anar més ràpid, `activaSimulacions`.
+Preparació: instal·lació completa ([README](../README.md)), `comprovaConfiguracio` sense errors, `interval_minuts` a 1 a la pestanya Configuració per anar més ràpid, `activaSimulacions`.
 
 | # | Pas | Resultat esperat | Estat | Observacions |
 | --- | --- | --- | --- | --- |
@@ -61,4 +61,4 @@ Preparació: instal·lació completa ([README](../README.md)), `comprovaConfigur
 | 12 | Escenari amb `max_torns=2` i proposta vaga repetida | El segon torn tanca la conversa | ⏳ | |
 | 13 | Revisar els registres d'Execucions | No hi apareix la clau ni adreces completes | ⏳ | |
 
-En acabar: `creaDisparador(5)` o `eliminaDisparadors`, i `aturaSimulacions` fins a la següent prova.
+En acabar: `interval_minuts` a 5 o `eliminaDisparadors`, i `aturaSimulacions` fins a la següent prova.

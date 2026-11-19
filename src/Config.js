@@ -11,7 +11,10 @@ var Config = (function () {
     FULL: 'SPREADSHEET_ID',
     REMITENTS: 'ALLOWED_SENDERS',
     ACTIVAT: 'SIMULATION_ENABLED',
-    // Opcional: adreça per a la funció auxiliar provaIniciaSimulacio().
+    // Interna: interval amb què es va crear el disparador actual.
+    INTERVAL_APLICAT: 'INTERVAL_APLICAT',
+    // Obsoletes: ara són a la pestanya Configuració. preparaFulls() les hi
+    // copia si existeixen, i comprovaConfiguracio() avisa que es poden esborrar.
     PROVA_PARTICIPANT: 'PROVA_PARTICIPANT',
     PROVA_ESCENARI: 'PROVA_ESCENARI'
   };
@@ -24,8 +27,12 @@ var Config = (function () {
     PROPIETATS.ACTIVAT
   ];
 
-  /** Límits de volum i durada. Ajustables aquí, no des de Sheets. */
+  /**
+   * Límits de volum i durada. Els valors per defecte de l'interval i dels
+   * torns es poden canviar a la pestanya Configuració; la resta, només aquí.
+   */
   var LIMITS = {
+    INTERVALS_PERMESOS: [1, 5, 10, 15, 30],
     MAX_TORNS_PER_DEFECTE: 6,
     MAX_TORNS_ABSOLUT: 12,
     MAX_CONVERSES_PER_EXECUCIO: 10,
@@ -103,6 +110,12 @@ var Config = (function () {
     propietats_().setProperty(PROPIETATS.ACTIVAT, activada ? 'true' : 'false');
   }
 
+  /** Desa una propietat interna (mai la clau d'API). */
+  function estableixPropietat(nom, valor) {
+    if (nom === PROPIETATS.CLAU) throw new Error('La clau d\'API no es pot modificar des del codi.');
+    propietats_().setProperty(nom, String(valor));
+  }
+
   function propietat(nom) {
     if (nom === PROPIETATS.CLAU) {
       throw new Error('La clau d\'API només es pot llegir amb Config.clauApi().');
@@ -120,6 +133,7 @@ var Config = (function () {
     esRemitentAutoritzat: esRemitentAutoritzat,
     estableixSimulacio: estableixSimulacio,
     propietat: propietat,
+    estableixPropietat: estableixPropietat,
     analitzaRemitents: analitzaRemitents,
     normalitzaCorreu: normalitzaCorreu,
     esCorreuValid: esCorreuValid

@@ -32,14 +32,14 @@ Aquesta versió és una **prova de concepte** del departament d'Administració i
  ┌───────────────────────────┐  2. correu de la clienta│  │    seu correu
  │ Google Apps Script        │─────────────────────────┘  │
  │ (bústia de prova de Gmail)│◄───────────────────────────┘
- │                           │  4. cada 5 minuts revisa si hi ha respostes
+ │                           │  4. cada pocs minuts revisa si hi ha respostes
  │                           │──► Gemini escriu la resposta de la clienta
  │                           │──► Google Sheets desa la conversa
  └───────────────────────────┘  5. respon dins del mateix fil
 ```
 
 - Tot funciona dins de Google: **Apps Script** (el programa), **Gmail** (la bústia que envia els correus de la clienta) i **Google Sheets** (el registre de converses).
-- Les respostes **no són instantànies**: el programa mira la bústia cada 5 minuts (es pot posar cada minut).
+- Les respostes **no són instantànies**: el programa mira la bústia cada 5 minuts. Es pot canviar (1, 5, 10, 15 o 30 minuts) a la pestanya **Configuració** del full de càlcul.
 - La conversa s'acaba quan la clienta queda satisfeta o quan s'arriba al màxim de 6 respostes. Llavors envia un comiat i ja no respon més.
 
 ## 2. Què necessites
@@ -109,7 +109,12 @@ A l'editor veureu un fitxer anomenat `Codi.gs` (o `Code.gs`) i `appsscript.json`
 
 ## 4. Configuració
 
-La configuració es desa a les **Propietats de l'script** (un espai privat del projecte que no es veu al codi).
+La configuració està repartida en dos llocs:
+
+- **Propietats de l'script** (dins d'Apps Script): la clau de Gemini i els controls de seguretat. És un espai privat que no es veu al codi ni al full de càlcul.
+- **Pestanya `Configuració`** (dins del full de càlcul): els paràmetres del dia a dia, com cada quan es revisa la bústia o amb qui s'inicia la propera simulació. Es canvien com qualsevol cel·la, sense tocar codi.
+
+### 4.1. Propietats de l'script
 
 1. A Apps Script, roda dentada ⚙️ **Configuració del projecte** → baixeu fins a **Propietats de l'script** → **Afegeix una propietat de l'script**.
 2. Afegiu aquestes propietats (nom exacte, en majúscules):
@@ -117,19 +122,16 @@ La configuració es desa a les **Propietats de l'script** (un espai privat del p
 | Propietat | Valor | Exemple |
 | --- | --- | --- |
 | `GEMINI_API_KEY` | La clau del pas 3.5 | `AIza…` |
-| `GEMINI_MODEL` | L'identificador del model triat | el que heu copiat a AI Studio |
+| `GEMINI_MODEL` | L'identificador del model triat | `gemini-3.5-flash-lite` |
 | `SPREADSHEET_ID` | L'identificador del full (pas 3.2) | `1AbCdEf…xyz` |
 | `ALLOWED_SENDERS` | **Totes** les adreces dels docents que poden participar, separades per comes | `docent1@example.org, docent2@example.org` |
 | `SIMULATION_ENABLED` | `false` (de moment) | `false` |
-| `PROVA_PARTICIPANT` | **Necessària per iniciar simulacions des de l'editor.** **Una sola adreça**, sense comes: la del docent amb qui iniciareu la propera simulació. Ha de ser també a `ALLOWED_SENDERS`. | `docent1@example.org` |
 
 3. Feu clic a **Desa les propietats de l'script**.
 
-> ❗ **No confongueu `ALLOWED_SENDERS` i `PROVA_PARTICIPANT`.** `ALLOWED_SENDERS` és la llista de **tots** els participants possibles. `PROVA_PARTICIPANT` és **només una** persona: la que rebrà el correu quan executeu `provaIniciaSimulacio`. Per iniciar una simulació amb una altra persona, canvieu `PROVA_PARTICIPANT` per la seva adreça i torneu a executar `provaIniciaSimulacio`.
-
 > ❗ A `ALLOWED_SENDERS` **no** hi poseu l'adreça de la bústia de prova: el programa ignoraria els correus o podria crear un bucle.
 
-### 4.1. Autoritzar i preparar el full
+### 4.2. Autoritzar i preparar el full
 
 1. Torneu a l'editor (`< >`) i obriu el fitxer **Main**.
 2. A la barra superior, al desplegable de funcions, trieu **`preparaFulls`** i feu clic a **Executa**.
@@ -137,34 +139,55 @@ La configuració es desa a les **Propietats de l'script** (un espai privat del p
    - **Revisa els permisos** → trieu el compte de prova.
    - Sortirà l'avís «**Google no ha verificat aquesta aplicació**». És normal: l'aplicació és vostra. Feu clic a **Configuració avançada** → **Ves a Rèplica (no segur)**.
    - Accepteu els permisos: **Gmail** (enviar i llegir els correus de la simulació), **Fulls de càlcul** (desar les converses), **connexió a serveis externs** (parlar amb Gemini) i **activadors** (revisar la bústia periòdicament).
-4. Al **Registre d'execució** (a sota) hauria d'aparèixer «Pestanya creada…». Si obriu el full de càlcul, hi veureu les pestanyes **Escenaris**, **Converses** i **Missatges**, i l'escenari ESC-001 ja carregat.
+4. Al **Registre d'execució** (a sota) hauria d'aparèixer «Pestanya creada…». Si obriu el full de càlcul, hi veureu les pestanyes **Configuració**, **Escenaris**, **Converses** i **Missatges**, i l'escenari ESC-001 ja carregat.
 
-### 4.2. Comprovar la configuració
+### 4.3. Pestanya Configuració
+
+Obriu el full de càlcul i aneu a la pestanya **Configuració**. Cada fila és un paràmetre: la columna **valor** és la que podeu canviar, i la columna **descripcio** explica què fa. Les cel·les amb opcions fixes tenen una llista desplegable.
+
+| Paràmetre (`clau`) | Què és | Valor inicial |
+| --- | --- | --- |
+| `interval_minuts` | Cada quants minuts es revisa la bústia: 1, 5, 10, 15 o 30. El canvi s'aplica sol a la propera revisió. | `5` |
+| `escenari` | L'escenari que s'envia en iniciar una simulació | `ESC-001` |
+| `participant` | **Una sola adreça**: el docent amb qui iniciareu la **propera** simulació. Ha de ser també a `ALLOWED_SENDERS`. | *(buit)* |
+| `max_torns_per_defecte` | Màxim de respostes de la clienta per conversa, si l'escenari no n'indica cap | `6` |
+
+Ara escriviu a `participant` l'adreça del docent que farà la primera prova.
+
+> ❗ **No confongueu `ALLOWED_SENDERS` i `participant`.** `ALLOWED_SENDERS` (a les Propietats de l'script) és la llista de **tots** els docents que poden participar. `participant` (a la pestanya Configuració) és **només una** persona: la que rebrà el correu quan executeu `provaIniciaSimulacio`. Per iniciar una simulació amb una altra persona, canvieu `participant` i torneu a executar `provaIniciaSimulacio`.
+
+> ℹ️ Si teníeu les propietats antigues `PROVA_PARTICIPANT` o `PROVA_ESCENARI`, `preparaFulls` n'ha copiat el valor a la pestanya. Després podeu esborrar-les de les Propietats de l'script.
+
+### 4.4. Comprovar la configuració
 
 1. Trieu **`comprovaConfiguracio`** → **Executa**.
-2. Al registre, cada línia ha de començar per `[OK]` o `[INFO]`. Si n'hi ha alguna amb `[ERROR]`, el text explica què cal corregir.
-3. És normal que, en aquest punt, la línia **Disparador** surti com a `[AVÍS]`: el crearem ara. Si la línia **PROVA_PARTICIPANT** també surt com a `[AVÍS]`, vol dir que encara no l'heu definida: caldrà fer-ho abans d'iniciar una simulació.
+2. Al registre, cada línia ha de començar per `[OK]` o `[INFO]`. Si n'hi ha alguna amb `[ERROR]`, el text explica què cal corregir. Les línies `Configuració › …` es refereixen a la pestanya Configuració.
+3. És normal que, en aquest punt, la línia **Disparador** surti com a `[AVÍS]`: el crearem ara. Si la línia **Configuració › participant** també surt com a `[AVÍS]`, vol dir que encara no hi heu escrit cap adreça.
 
-### 4.3. Activar la revisió automàtica
+### 4.5. Activar la revisió automàtica
 
-1. Trieu **`creaDisparador`** → **Executa**. A partir d'ara, el programa revisarà la bústia cada 5 minuts.
+1. Trieu **`creaDisparador`** → **Executa**. A partir d'ara, el programa revisarà la bústia amb l'interval de la pestanya Configuració (5 minuts, si no l'heu canviat).
 2. Mentre `SIMULATION_ENABLED` sigui `false`, aquesta revisió no farà res: és l'**interruptor general**.
 
 ## 5. Primera prova
 
 1. **Activeu l'interruptor general**: trieu **`activaSimulacions`** → **Executa** (això posa `SIMULATION_ENABLED` a `true`). Feu-ho només quan el coordinador ho hagi confirmat.
-2. Comproveu que la propietat `PROVA_PARTICIPANT` té l'adreça del docent participant (i que aquesta adreça també és a `ALLOWED_SENDERS`).
+2. Comproveu que la fila `participant` de la pestanya **Configuració** té l'adreça del docent participant (i que aquesta adreça també és a `ALLOWED_SENDERS`).
 3. Trieu **`provaIniciaSimulacio`** → **Executa**.
 4. El docent participant rebrà un correu de **Marta Soler** amb l'assumpte *«Reclamació: comanda CO-2026-0418 incompleta»*. (Si no el veu, que miri a la carpeta de correu brossa.)
 5. El participant **respon** al correu com ho faria amb un client real.
-6. En un màxim de 5 minuts (més el temps que trigui Gemini), rebrà la resposta de la clienta **dins del mateix fil**.
+6. Al cap d'uns minuts (com a màxim, l'interval de la pestanya Configuració més el temps que trigui Gemini), rebrà la resposta de la clienta **dins del mateix fil**.
 7. Podeu seguir la conversa al full de càlcul, a les pestanyes **Converses** i **Missatges**.
+
+> 💡 Per no haver d'esperar durant una demostració: quan el participant hagi respost, executeu **`processaCorreusPendents`** a mà. Fa el mateix que la revisió automàtica.
 
 ## 6. Ús habitual
 
-| Vull… | Què he de fer a l'editor d'Apps Script |
+| Vull… | Què he de fer |
 | --- | --- |
-| Iniciar una simulació | Canviar `PROVA_PARTICIPANT` per l'adreça del docent i executar `provaIniciaSimulacio` |
+| Iniciar una simulació | Escriure l'adreça del docent a `participant` (pestanya Configuració) i executar `provaIniciaSimulacio` |
+| Canviar cada quan es revisa la bústia | Canviar `interval_minuts` a la pestanya Configuració. S'aplica sol a la propera revisió (o al moment, executant `creaDisparador`) |
+| Fer servir un altre escenari | Triar-lo a `escenari` (pestanya Configuració) abans d'executar `provaIniciaSimulacio` |
 | Veure com van les converses | Executar `estatSimulacions` o obrir el full de càlcul |
 | **Aturar-ho tot de seguida** | Executar `aturaSimulacions` (posa `SIMULATION_ENABLED` a `false`) |
 | Tornar a engegar | Executar `activaSimulacions` |
@@ -179,9 +202,12 @@ Instruccions detallades: [docs/operacio.md](docs/operacio.md).
 | Què passa | Causa probable | Solució |
 | --- | --- | --- |
 | `La simulació està desactivada` | L'interruptor general està apagat | Executeu `activaSimulacions` |
+| `Escriviu l'adreça del docent participant a la pestanya Configuració` | La fila `participant` és buida | Escriviu-hi una adreça |
+| `… ha de contenir una sola adreça` | A `participant` hi ha diverses adreces | Deixeu-n'hi només una; la llista completa va a `ALLOWED_SENDERS` |
 | `L'adreça … no és a ALLOWED_SENDERS` | El participant no és a la llista | Afegiu-lo a la propietat `ALLOWED_SENDERS` |
 | `Ja hi ha una conversa oberta` | Aquest docent ja té una simulació en curs | Acabeu-la o tanqueu-la amb `tancaConversa` |
-| El participant respon però no arriba res | Encara no han passat 5 minuts, o l'interruptor és apagat | Espereu; mireu el full (columna `darrer_error`) i el menú **Execucions** d'Apps Script |
+| `… is not defined` (per exemple, `Bustia is not defined`) | Un fitxer de l'editor no té el codi que li correspon | Torneu a enganxar-hi el fitxer de `src/` del mateix nom (pas 3.4) |
+| El participant respon però no arriba res | Encara no ha passat l'interval de revisió, o l'interruptor és apagat | Espereu o executeu `processaCorreusPendents`; mireu el full (columna `darrer_error`) i el menú **Execucions** d'Apps Script |
 | `darrer_error` diu `HTTP 429` | S'ha exhaurit la quota de Gemini | El programa ho tornarà a provar sol; si persisteix, reviseu la quota a AI Studio |
 | `darrer_error` diu `HTTP 400` o `403` | La clau o el model no són correctes | Reviseu `GEMINI_API_KEY` i `GEMINI_MODEL`, executeu `comprovaConfiguracio` i després `reactivaConversa` |
 | La conversa queda en `ERROR` amb «No consta que la resposta s'enviés» | Una execució es va interrompre mentre enviava | Mireu el fil a Gmail. Si la resposta no hi és, executeu `reactivaConversa` |
@@ -204,7 +230,7 @@ replica-poc/
 │   ├── appsscript.json      Manifest: zona horària, V8 i permisos OAuth
 │   ├── Main.js              Funcions públiques (desplegable «Executa»)
 │   ├── Config.js            Script Properties i límits
-│   ├── SheetsRepository.js  Accés a Sheets (Escenaris, Converses, Missatges)
+│   ├── SheetsRepository.js  Accés a Sheets (Configuració, Escenaris, Converses, Missatges)
 │   ├── GmailGateway.js      Accés a Gmail, neteja de text i filtres
 │   ├── ConversationService.js  Lògica de conversa, reconciliació i tancament
 │   ├── PromptBuilder.js     Instruccions per a la IA
@@ -238,7 +264,7 @@ Documentació tècnica:
 
 ## 10. Estat del projecte i limitacions
 
-- ✅ Codi complet i **40 proves automàtiques** superades amb dobles de prova.
+- ✅ Codi complet i **46 proves automàtiques** superades amb dobles de prova.
 - ⏳ **Pendent de verificar en real**: l'enviament, la recepció, la resposta de Gemini i la continuïtat del fil. Fins que no es faci la prova de la secció 5, el prototip **no** es pot considerar funcional. Vegeu [docs/proves.md](docs/proves.md).
 - Les respostes poden trigar diversos minuts (revisió periòdica, no instantània).
 - Una sola bústia, un sol escenari i un sol personatge.

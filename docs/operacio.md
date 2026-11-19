@@ -14,11 +14,11 @@ També es pot canviar a mà a **Configuració del projecte → Propietats de l's
 ## Iniciar una simulació
 
 1. Comproveu que l'adreça del participant és a `ALLOWED_SENDERS`.
-2. Poseu-la a la propietat `PROVA_PARTICIPANT`: **només aquesta adreça**, sense comes (la llista completa va a `ALLOWED_SENDERS`). Si cal, poseu l'escenari a `PROVA_ESCENARI` (per defecte, `ESC-001`).
+2. Al full de càlcul, pestanya **Configuració**, escriviu-la a la fila `participant`: **només aquesta adreça**, sense comes (la llista completa va a `ALLOWED_SENDERS`). Si cal, trieu l'escenari a la fila `escenari` (per defecte, `ESC-001`).
 3. Executeu `provaIniciaSimulacio`.
 4. El registre mostra `idConversa` i `threadId`. Al full, pestanya **Converses**, apareix una fila nova en estat `ACTIVA`.
 
-Per què una propietat i no un paràmetre? Perquè el desplegable de l'editor no permet passar arguments, i així no cal escriure cap adreça real al codi (que acabaria a GitHub).
+Per què a la pestanya i no com a paràmetre? Perquè el desplegable de l'editor no permet passar arguments, i així no cal escriure cap adreça real al codi (que acabaria a GitHub).
 
 Restriccions: un participant no pot tenir dues converses obertes (`ACTIVA`, `PROCESSANT` o `ERROR`) del mateix escenari; cada conversa té el seu propi fil de Gmail.
 
@@ -78,8 +78,8 @@ Mateix procediment que l'anterior amb `tancaConversa('ID')`. La conversa passa a
 
 | Funció | Efecte |
 | --- | --- |
-| `creaDisparador` | Crea el disparador cada 5 minuts (elimina abans els existents: mai n'hi ha més d'un) |
-| `creaDisparador(1)` | Cada minut, per a demostracions. Cal una funció auxiliar (`function cadaMinut() { creaDisparador(1); }`) perquè el desplegable no passa paràmetres |
+| `creaDisparador` | Crea el disparador amb l'interval de la pestanya **Configuració** (`interval_minuts`; per defecte 5). Elimina abans els existents: mai n'hi ha més d'un |
+| Canviar `interval_minuts` a la pestanya | 1, 5, 10, 15 o 30. S'aplica sol a la propera revisió automàtica. Feu servir 1 minut només durant demostracions: consumeix molta quota diària |
 | `eliminaDisparadors` | Elimina'l: no es revisarà més la bústia |
 
 També es poden veure i eliminar al menú **Activadors** (icona del rellotge) d'Apps Script.

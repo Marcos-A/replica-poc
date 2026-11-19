@@ -24,7 +24,8 @@ test('Inicialització repetida: no duplica pestanyes ni escenaris', () => {
   const segon = e.g.preparaFulls();
   assert.ok(primer.length > 0);
   assert.equal(segon.length, 0);
-  assert.deepEqual([...e.llibre.fulls.keys()], ['Escenaris', 'Converses', 'Missatges']);
+  assert.deepEqual([...e.llibre.fulls.keys()], ['Configuració', 'Escenaris', 'Converses', 'Missatges']);
+  assert.equal(e.full('Configuració').objectes().length, 4);
   assert.equal(e.full('Escenaris').objectes().length, 1);
   assert.equal(e.full('Escenaris').objectes()[0].id, 'ESC-001');
 });
@@ -38,7 +39,7 @@ test('Inicialització: elimina la pestanya per defecte només si és buida', () 
   const canvis = e.g.preparaFulls();
   assert.ok(canvis.includes('Pestanya buida eliminada: Sheet1'));
   assert.deepEqual([...e.llibre.fulls.keys()].sort(),
-    ['Converses', 'Escenaris', 'Full 2', 'Missatges', 'Notes']);
+    ['Configuració', 'Converses', 'Escenaris', 'Full 2', 'Missatges', 'Notes']);
 });
 
 test('Inicialització: afegeix columnes que falten sense esborrar dades', () => {
@@ -61,17 +62,92 @@ test('Configuració incompleta: error llegible i sense exposar secrets', () => {
   assert.doesNotMatch(tot, /AIzaFALSA/);
 });
 
-test('Configuració: comprova PROVA_PARTICIPANT', () => {
+test('Configuració: comprova el participant de la pestanya', () => {
   const e = creaEntorn();
   e.g.preparaFulls();
-  const linia = () => e.g.comprovaConfiguracio(true).text.split('\n').find((l) => l.includes('PROVA_PARTICIPANT'));
-  assert.match(linia(), /^\[AVÍS\].*no definida/);
-  e.propietats.PROVA_PARTICIPANT = 'docent.a@example.org, docent.b@example.org';
+  const linia = () => e.g.comprovaConfiguracio(true).text.split('\n').find((l) => l.includes('› participant'));
+  assert.match(linia(), /^\[AVÍS\].*buit/);
+  e.configura('participant', 'docent.a@example.org, docent.b@example.org');
   assert.match(linia(), /^\[ERROR\].*una sola adreça/);
-  e.propietats.PROVA_PARTICIPANT = 'altre@example.org';
+  e.configura('participant', 'altre@example.org');
   assert.match(linia(), /^\[ERROR\].*no és a ALLOWED_SENDERS/);
-  e.propietats.PROVA_PARTICIPANT = 'docent.a@example.org';
-  assert.match(linia(), /^\[OK\] PROVA_PARTICIPANT: d\*\*\*@example\.org/);
+  e.configura('participant', 'docent.a@example.org');
+  assert.match(linia(), /^\[OK\] Configuració › participant: d\*\*\*@example\.org/);
+});
+
+test('Configuració: valors incorrectes donen errors llegibles i valors per defecte', () => {
+  const e = creaEntorn();
+  e.g.preparaFulls();
+  e.configura('interval_minuts', 7);
+  e.configura('escenari', 'ESC-999');
+  e.configura('max_torns_per_defecte', 40);
+  const r = e.g.comprovaConfiguracio(true);
+  assert.equal(r.correcte, false);
+  assert.match(r.text, /\[ERROR\] Configuració › interval_minuts: "7" no és vàlid/);
+  assert.match(r.text, /\[ERROR\] Configuració › escenari: ESC-999 no existeix/);
+  assert.match(r.text, /\[ERROR\] Configuració › max_torns_per_defecte/);
+  const v = e.g.Repositori.configuracio().valors;
+  assert.equal(v.intervalMinuts, 5);
+  assert.equal(v.maxTornsPerDefecte, 6);
+});
+
+test('Configuració: preparaFulls és idempotent, no sobreescriu valors i posa desplegables', () => {
+  const e = creaEntorn();
+  e.g.preparaFulls();
+  e.configura('interval_minuts', 15);
+  e.configura('participant', 'docent.b@example.org');
+  e.g.preparaFulls();
+  assert.equal(e.full('Configuració').objectes().length, 4);
+  assert.equal(e.parametre('interval_minuts'), 15);
+  assert.equal(e.parametre('participant'), 'docent.b@example.org');
+  const validacions = Object.values(e.full('Configuració').validacions);
+  assert.ok(validacions.some((r) => r.llista && r.llista.join() === '1,5,10,15,30'));
+  assert.ok(validacions.some((r) => r.rang && r.rang.full === 'Escenaris'));
+});
+
+test('Configuració: migra PROVA_PARTICIPANT i PROVA_ESCENARI i avisa que es poden esborrar', () => {
+  const e = creaEntorn({ propietats: { PROVA_PARTICIPANT: 'docent.b@example.org', PROVA_ESCENARI: 'ESC-001' } });
+  const canvis = e.g.preparaFulls();
+  assert.equal(e.parametre('participant'), 'docent.b@example.org');
+  assert.ok(canvis.some((c) => /participant \(copiat de la propietat PROVA_PARTICIPANT\)/.test(c)));
+  const r = e.g.comprovaConfiguracio(true);
+  assert.match(r.text, /\[AVÍS\] Propietat PROVA_PARTICIPANT: ja no s'utilitza/);
+});
+
+test('Configuració: max_torns_per_defecte s\'aplica si l\'escenari no en té', () => {
+  const e = creaEntorn();
+  e.g.preparaFulls();
+  const escenaris = e.full('Escenaris');
+  escenaris.dades[1][escenaris.dades[0].indexOf('max_torns')] = '';
+  e.configura('max_torns_per_defecte', 3);
+  assert.equal(e.g.Repositori.escenari('ESC-001').max_torns, 3);
+});
+
+test('Interval: canviar la pestanya recrea el disparador a la propera revisió', () => {
+  const e = creaEntorn();
+  e.g.preparaFulls();
+  e.g.creaDisparador();
+  assert.equal(e.disparadors.length, 1);
+  assert.equal(e.disparadors[0].minuts, 5);
+  e.configura('interval_minuts', 1);
+  e.g.processaCorreusPendents();
+  assert.equal(e.disparadors.length, 1);
+  assert.equal(e.disparadors[0].minuts, 1);
+  assert.equal(e.propietats.INTERVAL_APLICAT, '1');
+  // Sense canvis, no es recrea.
+  const abans = e.disparadors[0];
+  e.g.processaCorreusPendents();
+  assert.equal(e.disparadors[0], abans);
+});
+
+test('Interval: si s\'han eliminat els disparadors, la revisió no en crea cap', () => {
+  const e = creaEntorn();
+  e.g.preparaFulls();
+  e.g.creaDisparador();
+  e.g.eliminaDisparadors();
+  e.configura('interval_minuts', 10);
+  e.g.processaCorreusPendents();
+  assert.equal(e.disparadors.length, 0);
 });
 
 test('Configuració completa: diagnòstic correcte', () => {
@@ -117,14 +193,17 @@ test('Inici: rebutja adreces no autoritzades, duplicats i interruptor apagat', (
   assert.equal(e.gmail.enviats.length, 1);
 });
 
-test('provaIniciaSimulacio: PROVA_PARTICIPANT amb diverses adreces dona un error clar', () => {
-  const e = creaEntorn({ propietats: { PROVA_PARTICIPANT: 'docent.a@example.org, docent.b@example.org' } });
+test('provaIniciaSimulacio: fa servir el participant i l\'escenari de la pestanya Configuració', () => {
+  const e = creaEntorn();
   e.g.preparaFulls();
+  assert.throws(() => e.g.provaIniciaSimulacio(), /pestanya Configuració \(fila participant\)/);
+  e.configura('participant', 'docent.a@example.org, docent.b@example.org');
   assert.throws(() => e.g.provaIniciaSimulacio(), /una sola adreça/);
   assert.equal(e.gmail.enviats.length, 0);
-  e.propietats.PROVA_PARTICIPANT = 'docent.a@example.org';
+  e.configura('participant', 'docent.a@example.org');
   e.g.provaIniciaSimulacio();
   assert.equal(e.gmail.enviats.length, 1);
+  assert.equal(e.gmail.enviats[0].a, 'docent.a@example.org');
 });
 
 test('Resposta del participant: resposta coherent al mateix fil', () => {
@@ -381,12 +460,15 @@ test('Enviament inicial interromput: es reconcilia amb Enviats', () => {
   assert.equal(e.gmail.enviats.length, 1);
 });
 
-test('Disparador: només n\'hi ha un i es pot eliminar', () => {
+test('Disparador: només n\'hi ha un, creaDisparador(n) desa l\'interval i es pot eliminar', () => {
   const e = creaEntorn();
+  e.g.preparaFulls();
   e.g.creaDisparador(5);
   e.g.creaDisparador(1);
   assert.equal(e.disparadors.length, 1);
+  assert.equal(e.parametre('interval_minuts'), 1);
   assert.throws(() => e.g.creaDisparador(7), /Interval no vàlid/);
+  assert.equal(e.parametre('interval_minuts'), 1);
   assert.equal(e.g.eliminaDisparadors(), 1);
 });
 

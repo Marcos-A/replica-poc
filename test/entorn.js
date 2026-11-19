@@ -45,10 +45,11 @@ class FalsRang {
     return this;
   }
   setNumberFormat() { return this; }
+  setDataValidation(regla) { this.full.validacions[`${this.fila},${this.col}`] = regla; return this; }
 }
 
 class FalsFull {
-  constructor(nom) { this.nom = nom; this.dades = []; this.maxFiles = 1000; }
+  constructor(nom) { this.nom = nom; this.dades = []; this.maxFiles = 1000; this.validacions = {}; }
   getName() { return this.nom; }
   getLastRow() {
     for (let i = this.dades.length - 1; i >= 0; i--) {
@@ -63,7 +64,10 @@ class FalsFull {
   }
   getMaxRows() { return this.maxFiles; }
   insertRowsAfter(_fila, n) { this.maxFiles += n; }
-  getRange(fila, col, nf = 1, nc = 1) { return new FalsRang(this, fila, col, nf, nc); }
+  getRange(fila, col, nf = 1, nc = 1) {
+    if (typeof fila === 'string') return { a1: fila, full: this.nom };
+    return new FalsRang(this, fila, col, nf, nc);
+  }
   getDataRange() {
     return new FalsRang(this, 1, 1, Math.max(this.getLastRow(), 0), Math.max(this.getLastColumn(), 1));
   }
@@ -223,7 +227,19 @@ function creaEntorn(opcions = {}) {
     },
     SpreadsheetApp: {
       openById: (id) => { if (id !== 'full-de-prova') throw new Error('No es troba el full'); return llibre; },
-      flush: () => {}
+      flush: () => {},
+      newDataValidation: () => {
+        const regla = {};
+        const b = {
+          requireValueInList: (llista) => { regla.llista = llista; return b; },
+          requireValueInRange: (rang) => { regla.rang = rang; return b; },
+          requireNumberBetween: (min, max) => { regla.entre = [min, max]; return b; },
+          setAllowInvalid: () => b,
+          setHelpText: () => b,
+          build: () => regla
+        };
+        return b;
+      }
     },
     GmailApp: gmail,
     Session: { getEffectiveUser: () => ({ getEmail: () => BUSTIA }) },
@@ -240,8 +256,8 @@ function creaEntorn(opcions = {}) {
     ScriptApp: {
       getProjectTriggers: () => disparadors.slice(),
       deleteTrigger: (t) => disparadors.splice(disparadors.indexOf(t), 1),
-      newTrigger: (funcio) => ({ timeBased: () => ({ everyMinutes: () => ({
-        create: () => disparadors.push({ getHandlerFunction: () => funcio })
+      newTrigger: (funcio) => ({ timeBased: () => ({ everyMinutes: (minuts) => ({
+        create: () => disparadors.push({ getHandlerFunction: () => funcio, minuts })
       }) }) })
     },
     Date, JSON, Math, Object, Array, String, Number, Error, RegExp
@@ -258,6 +274,13 @@ function creaEntorn(opcions = {}) {
     converses: () => llibre.getSheetByName('Converses').objectes(),
     missatges: () => llibre.getSheetByName('Missatges').objectes(),
     respostesIA: (...r) => estat.respostesIA.push(...r),
+    /** Canvia una cel·la de la pestanya Configuració, com ho faria el docent. */
+    configura: (clau, valor) => {
+      const full = llibre.getSheetByName('Configuració');
+      const fila = full.dades.find((f) => f[0] === clau);
+      fila[1] = valor;
+    },
+    parametre: (clau) => (llibre.getSheetByName('Configuració').dades.find((f) => f[0] === clau) || [])[1],
     peticionsIA: () => peticions.filter((p) => p.url.endsWith('/interactions'))
   };
 }
